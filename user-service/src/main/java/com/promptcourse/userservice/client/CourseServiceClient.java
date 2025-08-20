@@ -1,0 +1,14 @@
+package com.promptcourse.userservice.client;
+
+import com.promptcourse.userservice.dto.course.UserPromptsDto;
+import org.springframework.cloud.openfeign.FeignClient;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+
+import java.util.List;
+
+@FeignClient(name = "COURSE-SERVICE")
+public interface CourseServiceClient {
+    @PostMapping("/internal/prompts/by-lectures")
+    List<UserPromptsDto> getPromptsByLectures(@RequestBody List<Long> lectureIds);
+}
