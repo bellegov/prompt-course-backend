@@ -20,6 +20,7 @@ public class CourseOutlineDto {
         private List<ChapterOutlineDto> chapters;
         private Long testId; // <-- ДОБАВЛЕНО: ID теста для этого раздела (или null)
         private int progressPercentage;
+        private boolean isUnlocked;
     }
 
     @Data

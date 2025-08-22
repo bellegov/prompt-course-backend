@@ -1,13 +1,7 @@
 package com.promptcourse.courseservice.client;
-import com.promptcourse.courseservice.dto.progress.AttemptRequest;
-import com.promptcourse.courseservice.dto.progress.AttemptStatusResponse;
-import com.promptcourse.courseservice.dto.progress.ProgressRequest;
-import com.promptcourse.courseservice.dto.progress.UserProgressResponse;
+import com.promptcourse.courseservice.dto.progress.*;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 @FeignClient(name = "PROGRESS-SERVICE")
 public interface ProgressServiceClient {
@@ -24,4 +18,8 @@ public interface ProgressServiceClient {
     // --- ВОССТАНОВЛЕННЫЙ МЕТОД ---
     @PostMapping("/internal/attempts/record-success")
     void recordSuccess(@RequestBody AttemptRequest request);
+
+    // --- НОВЫЙ МЕТОД ---
+    @GetMapping("/internal/global-progress/{userId}")
+    UserGlobalProgress getGlobalProgress(@PathVariable("userId") Long userId);
 }

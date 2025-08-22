@@ -4,11 +4,14 @@ import com.promptcourse.courseservice.client.ProgressServiceClient;
 import com.promptcourse.courseservice.dto.CourseOutlineDto;
 import com.promptcourse.courseservice.dto.CourseOutlineDto.*;
 import com.promptcourse.courseservice.dto.LectureContentDto;
-import com.promptcourse.courseservice.dto.LectureState; // Наш "родной" DTO
+import com.promptcourse.courseservice.dto.LectureState;
 import com.promptcourse.courseservice.dto.progress.ProgressRequest;
+import com.promptcourse.courseservice.dto.progress.UserGlobalProgress;
 import com.promptcourse.courseservice.dto.progress.UserProgressResponse;
 import com.promptcourse.courseservice.model.*;
-import com.promptcourse.courseservice.repository.*;
+import com.promptcourse.courseservice.repository.LectureRepository;
+import com.promptcourse.courseservice.repository.SectionRepository;
+import com.promptcourse.courseservice.repository.TestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -28,55 +31,52 @@ public class CourseViewService {
     private final ProgressServiceClient progressServiceClient;
 
     public CourseOutlineDto getCourseOutline(Long userId, boolean isSubscribed) {
+        // 1. Получаем "чистую" структуру курса, отсортированную по orderIndex
         List<Section> sections = sectionRepository.findAllByOrderByOrderIndexAsc();
 
-        // Создаем пустой DTO для ответа
-        CourseOutlineDto responseDto = CourseOutlineDto.builder()
-                .livesLeft(3) // Значения по умолчанию
-                .recoveryTimeLeft("00:00:00")
-                .build();
+        // 2. Получаем глобальный прогресс пользователя ОДИН РАЗ
+        UserGlobalProgress globalProgress = progressServiceClient.getGlobalProgress(userId);
+        int lastCompletedIndex = globalProgress.getLastCompletedSectionOrderIndex();
 
-        // Переменные для расчета общего прогресса
-        long totalLecturesInCourse = 0;
-        long completedLecturesInCourse = 0;
-
+        // 3. Формируем список секций с учетом статуса подписки и прогресса
         List<SectionOutlineDto> sectionDtos = sections.stream()
                 .map(section -> {
-                    // --- ПРОСТОЙ И НАДЕЖНЫЙ СПОСОБ СОЗДАТЬ ЗАПРОС ---
-                    ProgressRequest progressRequest = new ProgressRequest();
-                    progressRequest.setUserId(userId);
-                    progressRequest.setSectionId(section.getId());
-                    progressRequest.setSubscribed(isSubscribed);
-                    // ---------------------------------------------
-
-                    UserProgressResponse progress = progressServiceClient.getProgressForUser(progressRequest);
-
-                    // Обновляем общие данные о жизнях из самого первого ответа
-                    if (responseDto.getRecoveryTimeLeft().equals("00:00:00")) {
-                        responseDto.setLivesLeft(progress.getLivesLeft());
-                        responseDto.setRecoveryTimeLeft(progress.getRecoveryTimeLeft());
+                    // --- ЛОГИКА РАЗБЛОКИРОВКИ РАЗДЕЛОВ ---
+                    boolean isSectionUnlocked;
+                    if (isSubscribed) {
+                        isSectionUnlocked = true;
+                    } else {
+                        isSectionUnlocked = section.getOrderIndex() <= (lastCompletedIndex + 1);
                     }
 
-                    return mapSectionToDto(section, progress);
+                    // Запрашиваем детальный прогресс только для разблокированных секций
+                    UserProgressResponse progress = isSectionUnlocked
+                            ? progressServiceClient.getProgressForUser(new ProgressRequest(userId, section.getId(), isSubscribed))
+                            : null;
+
+                    return mapSectionToDto(section, progress, isSectionUnlocked);
                 })
                 .collect(Collectors.toList());
 
-        // Рассчитываем общий прогресс после получения всех данных
-        for (SectionOutlineDto sectionDto : sectionDtos) {
-            long totalLecturesInSection = sectionDto.getChapters().stream()
-                    .mapToLong(c -> c.getLectures().size()).sum();
-            totalLecturesInCourse += totalLecturesInSection;
-            completedLecturesInCourse += (totalLecturesInSection * sectionDto.getProgressPercentage()) / 100.0;
+        // 4. Получаем данные о жизнях и считаем общий прогресс
+        int livesLeft = 3;
+        String recoveryTimeLeft = "00:00:00";
+        if (!sections.isEmpty()) {
+            UserProgressResponse livesProgress = progressServiceClient.getProgressForUser(
+                    new ProgressRequest(userId, sections.get(0).getId(), isSubscribed)
+            );
+            livesLeft = livesProgress.getLivesLeft();
+            recoveryTimeLeft = livesProgress.getRecoveryTimeLeft();
         }
 
-        int totalCourseProgress = (totalLecturesInCourse > 0)
-                ? (int) (((double) completedLecturesInCourse / totalLecturesInCourse) * 100)
-                : 0;
+        int totalCourseProgress = calculateTotalProgress(sectionDtos);
 
-        responseDto.setSections(sectionDtos);
-        responseDto.setTotalCourseProgress(totalCourseProgress);
-
-        return responseDto;
+        return CourseOutlineDto.builder()
+                .sections(sectionDtos)
+                .livesLeft(livesLeft)
+                .recoveryTimeLeft(recoveryTimeLeft)
+                .totalCourseProgress(totalCourseProgress)
+                .build();
     }
 
     public LectureContentDto getLectureContent(Long lectureId) {
@@ -84,81 +84,77 @@ public class CourseViewService {
                 .orElseThrow(() -> new RuntimeException("Lecture not found"));
         Long testId = testRepository.findByLectureId(lectureId).map(Test::getId).orElse(null);
         return LectureContentDto.builder()
-                .id(lecture.getId())
-                .title(lecture.getTitle())
-                .contentText(lecture.getContentText())
-                .videoUrl(lecture.getVideoUrl())
-                .testId(testId)
-                .build();
+                .id(lecture.getId()).title(lecture.getTitle()).contentText(lecture.getContentText())
+                .videoUrl(lecture.getVideoUrl()).testId(testId).build();
     }
 
-    private SectionOutlineDto mapSectionToDto(Section section, UserProgressResponse progress) {
+    private SectionOutlineDto mapSectionToDto(Section section, UserProgressResponse progress, boolean isSectionUnlocked) {
         Long testId = testRepository.findBySectionId(section.getId()).map(Test::getId).orElse(null);
 
-        // --- ИСПРАВЛЕНИЕ: Конвертируем карту перед передачей ---
-        Map<Long, LectureState> convertedLectureStates = progress.getLectureStates().entrySet().stream()
-                .collect(Collectors.toMap(
-                        Map.Entry::getKey,
-                        entry -> LectureState.valueOf(entry.getValue().name()) // Преобразуем Enum
-                ));
+        // Если прогресс null (для заблокированных секций), создаем пустой объект, чтобы избежать NPE
+        UserProgressResponse safeProgress = (progress != null) ? progress : UserProgressResponse.builder().build();
+
+        Map<Long, LectureState> convertedLectureStates = safeProgress.getLectureStates() != null
+                ? safeProgress.getLectureStates().entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, e -> LectureState.valueOf(e.getValue().name())))
+                : Map.of();
 
         return SectionOutlineDto.builder()
-                .id(section.getId())
-                .title(section.getTitle())
-                .description(section.getDescription())
+                .id(section.getId()).title(section.getTitle()).description(section.getDescription())
                 .chapters(section.getChapters().stream()
                         .sorted(Comparator.comparingInt(Chapter::getOrderIndex))
-                        .map(chapter -> mapChapterToDto(chapter, progress.getChapterStates(), convertedLectureStates)) // Передаем уже конвертированную карту
+                        .map(chapter -> mapChapterToDto(chapter, safeProgress.getChapterStates(), convertedLectureStates))
                         .collect(Collectors.toList()))
                 .testId(testId)
-                .progressPercentage(progress.getProgressPercentage())
+                .progressPercentage(safeProgress.getProgressPercentage())
+                .isUnlocked(isSectionUnlocked)
                 .build();
     }
 
     private ChapterOutlineDto mapChapterToDto(Chapter chapter, Map<Long, Boolean> chapterStates, Map<Long, LectureState> lectureStates) {
         Long testId = testRepository.findByChapterId(chapter.getId()).map(Test::getId).orElse(null);
-
         List<Lecture> sortedLectures = chapter.getLectures().stream()
-                .sorted(Comparator.comparingInt(Lecture::getOrderIndex))
-                .collect(Collectors.toList());
-
+                .sorted(Comparator.comparingInt(Lecture::getOrderIndex)).collect(Collectors.toList());
         List<LectureOutlineDto> lectureDtos = new ArrayList<>();
 
         for (int i = 0; i < sortedLectures.size(); i++) {
             Lecture currentLecture = sortedLectures.get(i);
-            boolean promptsAvailableForCurrent = false;
-
+            boolean promptsAvailable = false;
             if (i + 1 < sortedLectures.size()) {
                 Lecture nextLecture = sortedLectures.get(i + 1);
-                LectureState nextLectureState = lectureStates.get(nextLecture.getId());
-                if (nextLectureState != null && nextLectureState != LectureState.LOCKED) {
-                    promptsAvailableForCurrent = true;
-                }
+                LectureState nextState = lectureStates.get(nextLecture.getId());
+                if (nextState != null && nextState != LectureState.LOCKED) promptsAvailable = true;
             } else {
-                // Это последняя лекция в последней главе. Промпты всегда доступны.
-                promptsAvailableForCurrent = true;
+                promptsAvailable = true;
             }
-            lectureDtos.add(mapLectureToDto(currentLecture, lectureStates, promptsAvailableForCurrent));
+            lectureDtos.add(mapLectureToDto(currentLecture, lectureStates, promptsAvailable));
         }
-
         return ChapterOutlineDto.builder()
-                .id(chapter.getId())
-                .title(chapter.getTitle())
-                .lectures(lectureDtos)
+                .id(chapter.getId()).title(chapter.getTitle()).lectures(lectureDtos)
                 .testId(testId)
-                .isUnlocked(chapterStates.getOrDefault(chapter.getId(), false))
+                .isUnlocked(chapterStates != null && chapterStates.getOrDefault(chapter.getId(), false))
                 .build();
     }
 
     private LectureOutlineDto mapLectureToDto(Lecture lecture, Map<Long, LectureState> lectureStates, boolean promptsAvailable) {
         Long testId = testRepository.findByLectureId(lecture.getId()).map(Test::getId).orElse(null);
         return LectureOutlineDto.builder()
-                .id(lecture.getId())
-                .title(lecture.getTitle())
-                .testId(testId)
+                .id(lecture.getId()).title(lecture.getTitle()).testId(testId)
                 .state(lectureStates.getOrDefault(lecture.getId(), LectureState.LOCKED))
-                .promptsAvailable(promptsAvailable)
-                .build();
+                .promptsAvailable(promptsAvailable).build();
+    }
+
+    private int calculateTotalProgress(List<SectionOutlineDto> sectionDtos) {
+        long totalLecturesInCourse = sectionDtos.stream()
+                .flatMap(s -> s.getChapters().stream())
+                .mapToLong(c -> c.getLectures().size()).sum();
+
+        long completedLecturesInCourse = sectionDtos.stream()
+                .flatMap(s -> s.getChapters().stream())
+                .flatMap(c -> c.getLectures().stream())
+                .filter(l -> l.getState() == LectureState.COMPLETED).count();
+
+        return (totalLecturesInCourse > 0)
+                ? (int) (((double) completedLecturesInCourse / totalLecturesInCourse) * 100)
+                : 0;
     }
 }
-
