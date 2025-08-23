@@ -5,17 +5,15 @@ import com.promptcourse.courseservice.model.*;
 import com.promptcourse.courseservice.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @RestController
-// Путь, который настроен в шлюзе
-@RequestMapping("/admin")
+@RequestMapping("/admin") // Все админские пути начинаются с /admin
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+// Аннотация @PreAuthorize удалена, так как проверка ролей теперь на шлюзе
 public class AdminCourseController {
 
     private final SectionRepository sectionRepository;
@@ -25,7 +23,7 @@ public class AdminCourseController {
     private final PromptRepository promptRepository;
 
     // === УПРАВЛЕНИЕ РАЗДЕЛАМИ ===
-    // CREATE
+
     @PostMapping("/sections")
     public ResponseEntity<Section> createSection(@RequestBody SectionDTO dto) {
         Section section = new Section();
@@ -35,14 +33,12 @@ public class AdminCourseController {
         Section saved = sectionRepository.save(section);
         return ResponseEntity.ok(saved);
     }
-    // READ (Получить все разделы)
+
     @GetMapping("/sections")
     public ResponseEntity<List<Section>> getAllSections() {
-        List<Section> sections = sectionRepository.findAll();
-        return ResponseEntity.ok(sections);
+        return ResponseEntity.ok(sectionRepository.findAll());
     }
 
-    // READ (Получить один раздел по ID)
     @GetMapping("/sections/{sectionId}")
     public ResponseEntity<Section> getSectionById(@PathVariable Long sectionId) {
         return sectionRepository.findById(sectionId)
@@ -50,7 +46,6 @@ public class AdminCourseController {
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // UPDATE (Обновить раздел)
     @PutMapping("/sections/{sectionId}")
     public ResponseEntity<Section> updateSection(@PathVariable Long sectionId, @RequestBody SectionDTO dto) {
         return sectionRepository.findById(sectionId)
@@ -58,59 +53,54 @@ public class AdminCourseController {
                     section.setTitle(dto.getTitle());
                     section.setDescription(dto.getDescription());
                     section.setOrderIndex(dto.getOrderIndex());
-                    Section updatedSection = sectionRepository.save(section);
-                    return ResponseEntity.ok(updatedSection);
+                    return ResponseEntity.ok(sectionRepository.save(section));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // DELETE (Удалить раздел)
     @DeleteMapping("/sections/{sectionId}")
     public ResponseEntity<Void> deleteSection(@PathVariable Long sectionId) {
         if (!sectionRepository.existsById(sectionId)) {
             return ResponseEntity.notFound().build();
         }
         sectionRepository.deleteById(sectionId);
-        return ResponseEntity.noContent().build(); // Стандартный ответ "Успешно удалено, нет содержимого"
+        return ResponseEntity.noContent().build();
     }
 
     // === УПРАВЛЕНИЕ ГЛАВАМИ ===
 
     @PostMapping("/sections/{sectionId}/chapters")
     public ResponseEntity<Chapter> createChapter(@PathVariable Long sectionId, @RequestBody ChapterDTO dto) {
-        Section section = sectionRepository.findById(sectionId)
-                .orElseThrow(() -> new RuntimeException("Section with id " + sectionId + " not found"));
-        Chapter chapter = new Chapter();
-        chapter.setTitle(dto.getTitle());
-        chapter.setOrderIndex(dto.getOrderIndex());
-        chapter.setSection(section);
-        Chapter saved = chapterRepository.save(chapter);
-        return ResponseEntity.ok(saved);
+        return sectionRepository.findById(sectionId)
+                .map(section -> {
+                    Chapter chapter = new Chapter();
+                    chapter.setTitle(dto.getTitle());
+                    chapter.setOrderIndex(dto.getOrderIndex());
+                    chapter.setSection(section);
+                    return ResponseEntity.ok(chapterRepository.save(chapter));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
-    // READ (Получить все главы конкретного раздела) - это полезный метод
+
     @GetMapping("/sections/{sectionId}/chapters")
     public ResponseEntity<List<Chapter>> getChaptersBySection(@PathVariable Long sectionId) {
         if (!sectionRepository.existsById(sectionId)) {
             return ResponseEntity.notFound().build();
         }
-        List<Chapter> chapters = chapterRepository.findBySectionId(sectionId); // Такой метод нужно будет добавить в репозиторий
-        return ResponseEntity.ok(chapters);
+        return ResponseEntity.ok(chapterRepository.findBySectionId(sectionId));
     }
 
-    // UPDATE (Обновить главу)
-    @PutMapping("/chapters/{chapterId}") // Обновляем по ID самой главы
+    @PutMapping("/chapters/{chapterId}")
     public ResponseEntity<Chapter> updateChapter(@PathVariable Long chapterId, @RequestBody ChapterDTO dto) {
         return chapterRepository.findById(chapterId)
                 .map(chapter -> {
                     chapter.setTitle(dto.getTitle());
                     chapter.setOrderIndex(dto.getOrderIndex());
-                    Chapter updatedChapter = chapterRepository.save(chapter);
-                    return ResponseEntity.ok(updatedChapter);
+                    return ResponseEntity.ok(chapterRepository.save(chapter));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // DELETE (Удалить главу)
     @DeleteMapping("/chapters/{chapterId}")
     public ResponseEntity<Void> deleteChapter(@PathVariable Long chapterId) {
         if (!chapterRepository.existsById(chapterId)) {
@@ -124,28 +114,27 @@ public class AdminCourseController {
 
     @PostMapping("/chapters/{chapterId}/lectures")
     public ResponseEntity<Lecture> createLecture(@PathVariable Long chapterId, @RequestBody LectureDTO dto) {
-        Chapter chapter = chapterRepository.findById(chapterId)
-                .orElseThrow(() -> new RuntimeException("Chapter with id " + chapterId + " not found"));
-        Lecture lecture = new Lecture();
-        lecture.setTitle(dto.getTitle());
-        lecture.setContentText(dto.getContentText());
-        lecture.setVideoUrl(dto.getVideoUrl());
-        lecture.setOrderIndex(dto.getOrderIndex());
-        lecture.setChapter(chapter);
-        Lecture saved = lectureRepository.save(lecture);
-        return ResponseEntity.ok(saved);
+        return chapterRepository.findById(chapterId)
+                .map(chapter -> {
+                    Lecture lecture = new Lecture();
+                    lecture.setTitle(dto.getTitle());
+                    lecture.setContentText(dto.getContentText());
+                    lecture.setVideoUrl(dto.getVideoUrl());
+                    lecture.setOrderIndex(dto.getOrderIndex());
+                    lecture.setChapter(chapter);
+                    return ResponseEntity.ok(lectureRepository.save(lecture));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
-    // READ (Получить все лекции конкретной главы)
+
     @GetMapping("/chapters/{chapterId}/lectures")
     public ResponseEntity<List<Lecture>> getLecturesByChapter(@PathVariable Long chapterId) {
         if (!chapterRepository.existsById(chapterId)) {
             return ResponseEntity.notFound().build();
         }
-        List<Lecture> lectures = lectureRepository.findByChapterId(chapterId); // <-- Добавить метод в репозиторий
-        return ResponseEntity.ok(lectures);
+        return ResponseEntity.ok(lectureRepository.findByChapterId(chapterId));
     }
 
-    // UPDATE (Обновить лекцию)
     @PutMapping("/lectures/{lectureId}")
     public ResponseEntity<Lecture> updateLecture(@PathVariable Long lectureId, @RequestBody LectureDTO dto) {
         return lectureRepository.findById(lectureId)
@@ -154,13 +143,11 @@ public class AdminCourseController {
                     lecture.setContentText(dto.getContentText());
                     lecture.setVideoUrl(dto.getVideoUrl());
                     lecture.setOrderIndex(dto.getOrderIndex());
-                    Lecture updatedLecture = lectureRepository.save(lecture);
-                    return ResponseEntity.ok(updatedLecture);
+                    return ResponseEntity.ok(lectureRepository.save(lecture));
                 })
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // DELETE (Удалить лекцию)
     @DeleteMapping("/lectures/{lectureId}")
     public ResponseEntity<Void> deleteLecture(@PathVariable Long lectureId) {
         if (!lectureRepository.existsById(lectureId)) {
@@ -170,13 +157,58 @@ public class AdminCourseController {
         return ResponseEntity.noContent().build();
     }
 
+    // === УПРАВЛЕНИЕ ЗАПРОСАМИ (ПРОМПТАМИ) ===
+
+    @PostMapping("/lectures/{lectureId}/prompts")
+    public ResponseEntity<Prompt> addPromptToLecture(@PathVariable Long lectureId, @RequestBody PromptDto dto) {
+        return lectureRepository.findById(lectureId)
+                .map(lecture -> {
+                    Prompt prompt = new Prompt();
+                    prompt.setTitle(dto.getTitle());
+                    prompt.setPromptText(dto.getPromptText());
+                    prompt.setLecture(lecture);
+                    return ResponseEntity.ok(promptRepository.save(prompt));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/lectures/{lectureId}/prompts")
+    public ResponseEntity<List<Prompt>> getPromptsForLecture(@PathVariable Long lectureId) {
+        return lectureRepository.findById(lectureId)
+                .map(lecture -> ResponseEntity.ok(lecture.getPrompts()))
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/prompts/{promptId}")
+    public ResponseEntity<Prompt> updatePrompt(@PathVariable Long promptId, @RequestBody PromptDto dto) {
+        return promptRepository.findById(promptId)
+                .map(prompt -> {
+                    prompt.setTitle(dto.getTitle());
+                    prompt.setPromptText(dto.getPromptText());
+                    return ResponseEntity.ok(promptRepository.save(prompt));
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/prompts/{promptId}")
+    public ResponseEntity<Void> deletePrompt(@PathVariable Long promptId) {
+        if (!promptRepository.existsById(promptId)) {
+            return ResponseEntity.notFound().build();
+        }
+        promptRepository.deleteById(promptId);
+        return ResponseEntity.noContent().build();
+    }
+
     // === УПРАВЛЕНИЕ ТЕСТАМИ ===
     @PostMapping("/lectures/{lectureId}/test")
     public ResponseEntity<Test> createTestForLecture(@PathVariable Long lectureId, @RequestBody CreateTestRequest request) {
-        Lecture lecture = lectureRepository.findById(lectureId).orElseThrow(() -> new RuntimeException("Lecture not found"));
-        Test test = buildTestFromRequest(request);
-        test.setLecture(lecture);
-        return ResponseEntity.ok(testRepository.save(test));
+        return lectureRepository.findById(lectureId)
+                .map(lecture -> {
+                    Test test = buildTestFromRequest(request);
+                    test.setLecture(lecture);
+                    return ResponseEntity.ok(testRepository.save(test));
+                })
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping("/chapters/{chapterId}/test")
@@ -251,47 +283,5 @@ public class AdminCourseController {
         });
         return test;
     }
-    // === УПРАВЛЕНИЕ ЗАПРОСАМИ (ПРОМПТАМИ) ===
 
-    // CREATE (Добавить промпт к лекции)
-    @PostMapping("/lectures/{lectureId}/prompts")
-    public ResponseEntity<Prompt> addPromptToLecture(@PathVariable Long lectureId, @RequestBody PromptDto dto) {
-        Lecture lecture = lectureRepository.findById(lectureId)
-                .orElseThrow(() -> new RuntimeException("Lecture not found with id: " + lectureId));
-        Prompt prompt = new Prompt();
-        prompt.setTitle(dto.getTitle());
-        prompt.setPromptText(dto.getPromptText());
-        prompt.setLecture(lecture);
-        return ResponseEntity.ok(promptRepository.save(prompt));
-    }
-
-    // READ (Получить все промпты для лекции)
-    @GetMapping("/lectures/{lectureId}/prompts")
-    public ResponseEntity<List<Prompt>> getPromptsForLecture(@PathVariable Long lectureId) {
-        Lecture lecture = lectureRepository.findById(lectureId)
-                .orElseThrow(() -> new RuntimeException("Lecture not found with id: " + lectureId));
-        return ResponseEntity.ok(lecture.getPrompts());
-    }
-
-    // UPDATE (Обновить текст промпта)
-    @PutMapping("/prompts/{promptId}")
-    public ResponseEntity<Prompt> updatePrompt(@PathVariable Long promptId, @RequestBody PromptDto dto) {
-        return promptRepository.findById(promptId)
-                .map(prompt -> {
-                    prompt.setTitle(dto.getTitle());
-                    prompt.setPromptText(dto.getPromptText());
-                    return ResponseEntity.ok(promptRepository.save(prompt));
-                })
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    // DELETE (Удалить промпт)
-    @DeleteMapping("/prompts/{promptId}")
-    public ResponseEntity<Void> deletePrompt(@PathVariable Long promptId) {
-        if (!promptRepository.existsById(promptId)) {
-            return ResponseEntity.notFound().build();
-        }
-        promptRepository.deleteById(promptId);
-        return ResponseEntity.noContent().build();
-    }
 }

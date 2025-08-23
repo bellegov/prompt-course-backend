@@ -1,100 +1,67 @@
-version: '3.8'
 
+version: '3.8'
 services:
-  # 1. Реестр сервисов (Eureka)
+  # 1. Реестр сервисов
   service-registry:
     build: ./service-registry
     container_name: service-registry
-    ports:
-      - "8761:8761"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
+    ports: ["8761:8761"]
 
   # 2. API Шлюз
   api-gateway:
     build: ./api-gateway
     container_name: api-gateway
+    env_file: ./.env
     ports:
       - "${API_GATEWAY_PORT}:${SERVER_PORT_API_GATEWAY}"
-    depends_on:
-      service-registry:
-        condition: service_healthy
+    depends_on: [service-registry]
     environment:
       SERVER_PORT: ${SERVER_PORT_API_GATEWAY}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka/
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
 
-  # 3. БД для Сервиса Пользователей
+  # --- БАЗЫ ДАННЫХ ---
   user-db:
     image: postgres:15-alpine
     container_name: user-db
-    ports:
-      - "5434:5432"
+    ports: ["5434:5432"]
+    env_file: ./.env
     environment:
       POSTGRES_DB: ${USER_DB_NAME}
       POSTGRES_USER: ${USER_DB_USER}
       POSTGRES_PASSWORD: ${USER_DB_PASSWORD}
-    volumes:
-      - pgdata-user:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${USER_DB_USER} -d ${USER_DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    volumes: [pgdata-user:/var/lib/postgresql/data]
 
-  # 4. БД для Сервиса Курсов
   course-db:
     image: postgres:15-alpine
     container_name: course-db
-    ports:
-      - "5433:5432"
+    ports: ["5433:5432"]
+    env_file: ./.env
     environment:
       POSTGRES_DB: ${COURSE_DB_NAME}
       POSTGRES_USER: ${COURSE_DB_USER}
       POSTGRES_PASSWORD: ${COURSE_DB_PASSWORD}
-    volumes:
-      - pgdata-course:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${COURSE_DB_USER} -d ${COURSE_DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
-  # 5. БД для Сервиса Прогресса
+    volumes: [pgdata-course:/var/lib/postgresql/data]
+    
   progress-db:
     image: postgres:15-alpine
     container_name: progress-db
-    ports:
-      - "5435:5432"
+    ports: ["5435:5432"]
+    env_file: ./.env
     environment:
       POSTGRES_DB: ${PROGRESS_DB_NAME}
       POSTGRES_USER: ${PROGRESS_DB_USER}
       POSTGRES_PASSWORD: ${PROGRESS_DB_PASSWORD}
-    volumes:
-      - pgdata-progress:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${PROGRESS_DB_USER} -d ${PROGRESS_DB_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
+    volumes: [pgdata-progress:/var/lib/postgresql/data]
 
-  # 6. Сервис Пользователей
+  # --- МИКРОСЕРВИСЫ ПРИЛОЖЕНИЯ ---
   user-service:
     build: ./user-service
     container_name: user-service
+    env_file: ./.env
     ports:
       - "${USER_SERVICE_PORT}:${SERVER_PORT_USER_SERVICE}"
-    depends_on:
-      service-registry:
-        condition: service_healthy
-      user-db:
-        condition: service_healthy
+    depends_on: [service-registry, user-db]
     environment:
       SERVER_PORT: ${SERVER_PORT_USER_SERVICE}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka/
@@ -104,21 +71,14 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       APP_JWT_SECRET: ${APP_JWT_SECRET}
       APP_JWT_EXPIRATION_MS: ${APP_JWT_EXPIRATION_MS}
-      YOOMONEY_SHOP_ID: ${YOOMONEY_SHOP_ID}
-      YOOMONEY_SECRET_KEY: ${YOOMONEY_SECRET_KEY}
-    restart: on-failure
 
-  # 7. Сервис Курсов
   course-service:
     build: ./course-service
     container_name: course-service
+    env_file: ./.env
     ports:
       - "${COURSE_SERVICE_PORT}:${SERVER_PORT_COURSE_SERVICE}"
-    depends_on:
-      service-registry:
-        condition: service_healthy
-      course-db:
-        condition: service_healthy
+    depends_on: [service-registry, course-db]
     environment:
       SERVER_PORT: ${SERVER_PORT_COURSE_SERVICE}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka/
@@ -126,19 +86,14 @@ services:
       SPRING_DATASOURCE_USERNAME: ${COURSE_DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${COURSE_DB_PASSWORD}
       APP_JWT_SECRET: ${APP_JWT_SECRET}
-    restart: on-failure
 
-  # 8. Сервис Прогресса
   progress-service:
     build: ./progress-service
     container_name: progress-service
+    env_file: ./.env
     ports:
       - "${PROGRESS_SERVICE_PORT}:${SERVER_PORT_PROGRESS_SERVICE}"
-    depends_on:
-      service-registry:
-        condition: service_healthy
-      progress-db:
-        condition: service_healthy
+    depends_on: [service-registry, progress-db]
     environment:
       SERVER_PORT: ${SERVER_PORT_PROGRESS_SERVICE}
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka/
@@ -146,28 +101,19 @@ services:
       SPRING_DATASOURCE_USERNAME: ${PROGRESS_DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${PROGRESS_DB_PASSWORD}
       APP_JWT_SECRET: ${APP_JWT_SECRET}
-    restart: on-failure
-
-  # 9. Adminer для управления БД
+      
+  # --- ВСПОМОГАТЕЛЬНЫЕ ИНСТРУМЕНТЫ ---
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    ports: ["9411:9411"]
+    
   adminer:
     image: adminer
     container_name: adminer
     ports:
       - "${ADMINER_PORT}:8080"
-    depends_on:
-      user-db:
-        condition: service_healthy
-      course-db:
-        condition: service_healthy
-      progress-db:
-        condition: service_healthy
-
-        # --- НОВЫЙ СЕРВИС: Сборщик трассировок ---
-  zipkin:
-    image: openzipkin/zipkin
-    container_name: zipkin
-    ports:
-      - "9411:9411" # Порт для веб-интерфейса Zipkin
+    depends_on: [user-db, course-db, progress-db]
 
 volumes:
   pgdata-user:

@@ -1,13 +1,10 @@
 package com.promptcourse.progressservice.controller;
 
 import com.promptcourse.progressservice.model.UserGlobalProgress;
-import com.promptcourse.progressservice.security.UserPrincipal;
 import com.promptcourse.progressservice.service.GlobalProgressService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.Map;
 
 @RestController
@@ -20,14 +17,13 @@ public class GlobalProgressController {
     @PostMapping("/complete-section")
     public ResponseEntity<Void> completeSection(
             @RequestBody Map<String, Integer> payload,
-            Authentication authentication
+            @RequestHeader("X-User-ID") Long userId // <-- Читаем ID из заголовка
     ) {
-        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
         Integer sectionOrderIndex = payload.get("sectionOrderIndex");
         if (sectionOrderIndex == null) {
             return ResponseEntity.badRequest().build();
         }
-        globalProgressService.completeSection(principal.getId(), sectionOrderIndex);
+        globalProgressService.completeSection(userId, sectionOrderIndex);
         return ResponseEntity.ok().build();
     }
 

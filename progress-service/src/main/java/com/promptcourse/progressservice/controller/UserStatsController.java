@@ -1,11 +1,10 @@
 package com.promptcourse.progressservice.controller;
+
 import com.promptcourse.progressservice.model.UserStats;
-import com.promptcourse.progressservice.security.UserPrincipal;
 import com.promptcourse.progressservice.service.UserStatsService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
 @RestController
 public class UserStatsController {
 
@@ -15,22 +14,21 @@ public class UserStatsController {
         this.statsService = statsService;
     }
 
-    // Публичный эндпоинт
+    // Публичный
     @PostMapping("/stats/check-in")
-    public ResponseEntity<Void> dailyCheckIn(Authentication authentication) {
-        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-        statsService.processDailyLogin(principal.getId());
+    public ResponseEntity<Void> dailyCheckIn(@RequestHeader("X-User-ID") Long userId) { // <-- Читаем ID из заголовка
+        statsService.processDailyLogin(userId);
         return ResponseEntity.ok().build();
     }
 
-    // Внутренний эндпоинт
+    // Внутренний
     @PostMapping("/internal/increment-lectures")
     public ResponseEntity<Void> incrementLectures(@RequestParam Long userId) {
         statsService.incrementLecturesCompleted(userId);
         return ResponseEntity.ok().build();
     }
 
-    // Внутренний эндпоинт для профиля
+    // Внутренний
     @GetMapping("/internal/stats/users/{userId}")
     public ResponseEntity<UserStats> getStatsForUser(@PathVariable Long userId) {
         return ResponseEntity.ok(statsService.getStatsForUser(userId));
