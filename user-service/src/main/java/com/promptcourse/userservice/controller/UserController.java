@@ -1,5 +1,6 @@
 package com.promptcourse.userservice.controller;
 
+import com.promptcourse.userservice.dto.MergeAccountRequest;
 import com.promptcourse.userservice.dto.SetPasswordRequest;
 import com.promptcourse.userservice.dto.UserProfileDto;
 import com.promptcourse.userservice.dto.course.UserPromptsDto;
@@ -73,5 +74,19 @@ public class UserController {
     public ResponseEntity<List<UserPromptsDto>> getPrompts(Authentication authentication) {
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
         return ResponseEntity.ok(userProfileService.getUserPrompts(principal.getId()));
+    }
+    // Эндпоинт для получения слияния аккаунтов
+    @PostMapping("/profile/merge")
+    public ResponseEntity<Void> mergeAccounts(
+            @RequestBody MergeAccountRequest request,
+            Authentication authentication
+    ) {
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        userProfileService.mergeAccounts(principal.getId(), request);
+
+        // ВАЖНО: после этого слияния текущий токен становится невалидным,
+        // так как он привязан к удаленному tg_user_id.
+        // Фронтенд должен будет попросить пользователя залогиниться заново.
+        return ResponseEntity.ok().build();
     }
 }

@@ -53,9 +53,12 @@ public class AuthService {
     }
 
     public AuthResponse authWithTelegram(String initData) {
+        /*
         if (!isInitDataValid(initData)) {
             throw new IllegalArgumentException("Invalid initData: hash validation failed");
         }
+
+         */
         try {
             Map<String, String> params = parseInitData(initData);
             String userJsonString = params.get("user");

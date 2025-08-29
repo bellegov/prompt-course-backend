@@ -11,6 +11,7 @@ public class UserProfileDto {
     private String email;
     private Integer avatarId;
     private boolean isSubscribed;
+    private Long telegramId;
 
     // Данные из progress-service
     private int totalLecturesCompleted;

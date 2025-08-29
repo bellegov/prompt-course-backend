@@ -2,6 +2,7 @@ package com.promptcourse.userservice.service;
 
 import com.promptcourse.userservice.client.CourseServiceClient;
 import com.promptcourse.userservice.client.ProgressServiceClient;
+import com.promptcourse.userservice.dto.MergeAccountRequest;
 import com.promptcourse.userservice.dto.SetPasswordRequest;
 import com.promptcourse.userservice.dto.UserProfileDto;
 import com.promptcourse.userservice.dto.course.UserPromptsDto;
@@ -13,6 +14,8 @@ import com.promptcourse.userservice.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.time.LocalDateTime;
 
 import java.util.ArrayList;
@@ -48,6 +51,7 @@ public class UserProfileService {
                 .email(user.getEmail())
                 .avatarId(user.getAvatarId())
                 .isSubscribed(isSubscribed) // <-- Используем реальное значение
+                .telegramId(user.getTelegramId())
                 .totalLecturesCompleted(stats.getTotalLecturesCompleted())
                 .consecutiveDays(stats.getConsecutiveDays())
                 .totalActiveDays(stats.getTotalActiveDays())
@@ -95,4 +99,43 @@ public class UserProfileService {
         user.setEmail(email);
         userRepository.save(user);
     }
+    @Transactional
+    public void mergeAccounts(Long telegramUserId, MergeAccountRequest request) {
+        // 1. Находим "пустой" аккаунт, созданный через Telegram
+        User telegramUser = userRepository.findById(telegramUserId)
+                .orElseThrow(() -> new RuntimeException("Telegram user not found"));
+
+        // 2. Находим "старый" аккаунт по email
+        User siteUser = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Site account not found"));
+
+        // 3. Проверяем пароль от "старого" аккаунта
+        if (siteUser.getPassword() == null || !passwordEncoder.matches(request.getPassword(), siteUser.getPassword())) {
+            throw new IllegalArgumentException("Invalid credentials for the site account");
+        }
+
+        // 4. Проверяем, что у "старого" аккаунта еще не привязан другой Telegram
+        if (siteUser.getTelegramId() != null) {
+            throw new IllegalStateException("The site account is already linked to another Telegram account.");
+        }
+
+        // 5. Проверяем, что мы не пытаемся слить аккаунт сам с собой
+        if (telegramUser.getId().equals(siteUser.getId())) {
+            throw new IllegalStateException("Cannot merge an account with itself.");
+        }
+
+        // --- ПРАВИЛЬНАЯ ОПЕРАЦИЯ СЛИЯНИЯ ---
+
+        // СНАЧАЛА: Сохраняем telegram_id в переменную
+        Long telegramIdToMerge = telegramUser.getTelegramId();
+
+        // ЗАТЕМ: Удаляем временный аккаунт (освобождает ограничение)
+        userRepository.delete(telegramUser);
+        userRepository.flush();
+
+        // ПОТОМ: Устанавливаем telegram_id в основной аккаунт
+        siteUser.setTelegramId(telegramIdToMerge);
+        userRepository.save(siteUser);
+    }
+
 }
