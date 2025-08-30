@@ -1,7 +1,7 @@
 package com.promptcourse.userservice.dto;
 import lombok.Data;
 @Data
-public class MergeAccountRequest {
+public class LinkAccountRequest {
     private String email;
     private String password;
 }

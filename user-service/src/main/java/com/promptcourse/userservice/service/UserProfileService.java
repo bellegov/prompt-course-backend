@@ -2,8 +2,7 @@ package com.promptcourse.userservice.service;
 
 import com.promptcourse.userservice.client.CourseServiceClient;
 import com.promptcourse.userservice.client.ProgressServiceClient;
-import com.promptcourse.userservice.dto.MergeAccountRequest;
-import com.promptcourse.userservice.dto.SetPasswordRequest;
+import com.promptcourse.userservice.dto.LinkAccountRequest;
 import com.promptcourse.userservice.dto.UserProfileDto;
 import com.promptcourse.userservice.dto.course.UserPromptsDto;
 import com.promptcourse.userservice.dto.progress.UserStats;
@@ -20,6 +19,7 @@ import java.time.LocalDateTime;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -67,75 +67,63 @@ public class UserProfileService {
         // 2. Запрашиваем промпты для этих лекций
         return courseServiceClient.getPromptsByLectures(new ArrayList<>(completedLectureIds));
     }
+
     public void updateUserAvatar(Long userId, Integer newAvatarId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         user.setAvatarId(newAvatarId);
         userRepository.save(user);
-    }  public void setUserPassword(Long userId, SetPasswordRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        // Простая проверка, что пароль не пустой
-        if (request.getNewPassword() == null || request.getNewPassword().isBlank()) {
-            throw new IllegalArgumentException("Password cannot be empty.");
-        }
-
-        // Хэшируем и сохраняем новый пароль
-        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-        userRepository.save(user);
     }
 
-    // --- НОВЫЙ МЕТОД ДЛЯ УСТАНОВКИ EMAIL ---
-    public void setUserEmail(Long userId, String email) {
-        // Здесь мы должны использовать нашу проверку на уникальность!
-        if (userRepository.existsByEmail(email)) {
-            throw new IllegalStateException("Email " + email + " is already taken.");
-        }
-
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        user.setEmail(email);
-        userRepository.save(user);
-    }
     @Transactional
-    public void mergeAccounts(Long telegramUserId, MergeAccountRequest request) {
-        // 1. Находим "пустой" аккаунт, созданный через Telegram
+    public void linkAccount(Long telegramUserId, LinkAccountRequest request) {
+        // 1. Ищем текущий Telegram-аккаунт (от которого пришел запрос)
         User telegramUser = userRepository.findById(telegramUserId)
-                .orElseThrow(() -> new RuntimeException("Telegram user not found"));
+                .orElseThrow(() -> new RuntimeException("Current Telegram user not found"));
 
-        // 2. Находим "старый" аккаунт по email
-        User siteUser = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Site account not found"));
+        // 2. Ищем, существует ли уже аккаунт с таким email
+        Optional<User> existingSiteUserOpt = userRepository.findByEmail(request.getEmail());
 
-        // 3. Проверяем пароль от "старого" аккаунта
-        if (siteUser.getPassword() == null || !passwordEncoder.matches(request.getPassword(), siteUser.getPassword())) {
-            throw new IllegalArgumentException("Invalid credentials for the site account");
+        if (existingSiteUserOpt.isPresent()) {
+            // --- СЦЕНАРИЙ СЛИЯНИЯ ---
+            User siteUser = existingSiteUserOpt.get();
+
+            // Проверяем, что мы не пытаемся слить аккаунт сам с собой
+            if (telegramUser.getId().equals(siteUser.getId())) {
+                throw new IllegalStateException("This email is already linked to your account.");
+            }
+
+            // Проверяем пароль от "старого" аккаунта
+            if (siteUser.getPassword() == null || !passwordEncoder.matches(request.getPassword(), siteUser.getPassword())) {
+                throw new IllegalArgumentException("Invalid password for the existing account.");
+            }
+
+            // Проверяем, что у "старого" аккаунта еще не привязан другой Telegram
+            if (siteUser.getTelegramId() != null) {
+                throw new IllegalStateException("The site account is already linked to another Telegram account.");
+            }
+
+            // Запоминаем telegram_id для переноса
+            Long telegramIdToMerge = telegramUser.getTelegramId();
+
+            // TODO: Перенести прогресс
+            // progressService.mergeProgress(telegramUser.getId(), siteUser.getId());
+
+            // Сначала удаляем временный telegram-аккаунт
+            userRepository.delete(telegramUser);
+            userRepository.flush(); // Принудительно применяем удаление
+
+            // Затем обновляем основной аккаунт
+            siteUser.setTelegramId(telegramIdToMerge);
+            userRepository.save(siteUser);
+
+        } else {
+            // --- СЦЕНАРИЙ "ДООПРЕДЕЛЕНИЯ" ---
+            // Email свободен. Просто дополняем текущий Telegram-аккаунт.
+            telegramUser.setEmail(request.getEmail());
+            telegramUser.setPassword(passwordEncoder.encode(request.getPassword()));
+            userRepository.save(telegramUser);
         }
-
-        // 4. Проверяем, что у "старого" аккаунта еще не привязан другой Telegram
-        if (siteUser.getTelegramId() != null) {
-            throw new IllegalStateException("The site account is already linked to another Telegram account.");
-        }
-
-        // 5. Проверяем, что мы не пытаемся слить аккаунт сам с собой
-        if (telegramUser.getId().equals(siteUser.getId())) {
-            throw new IllegalStateException("Cannot merge an account with itself.");
-        }
-
-        // --- ПРАВИЛЬНАЯ ОПЕРАЦИЯ СЛИЯНИЯ ---
-
-        // СНАЧАЛА: Сохраняем telegram_id в переменную
-        Long telegramIdToMerge = telegramUser.getTelegramId();
-
-        // ЗАТЕМ: Удаляем временный аккаунт (освобождает ограничение)
-        userRepository.delete(telegramUser);
-        userRepository.flush();
-
-        // ПОТОМ: Устанавливаем telegram_id в основной аккаунт
-        siteUser.setTelegramId(telegramIdToMerge);
-        userRepository.save(siteUser);
     }
 
 }

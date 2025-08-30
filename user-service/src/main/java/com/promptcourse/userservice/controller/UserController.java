@@ -1,10 +1,11 @@
 package com.promptcourse.userservice.controller;
 
-import com.promptcourse.userservice.dto.MergeAccountRequest;
-import com.promptcourse.userservice.dto.SetPasswordRequest;
+import com.promptcourse.userservice.dto.CreatePaymentResponse;
+import com.promptcourse.userservice.dto.LinkAccountRequest;
 import com.promptcourse.userservice.dto.UserProfileDto;
 import com.promptcourse.userservice.dto.course.UserPromptsDto;
 import com.promptcourse.userservice.security.UserPrincipal;
+import com.promptcourse.userservice.service.PaymentService;
 import com.promptcourse.userservice.service.UserProfileService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class UserController {
 
     private final UserProfileService userProfileService;
+    private final PaymentService paymentService ;
 
     @GetMapping("/profile")
     // Явно говорим, что сюда можно пользователям с ролью USER или ADMIN
@@ -44,49 +46,32 @@ public class UserController {
         userProfileService.updateUserAvatar(principal.getId(), newAvatarId);
         return ResponseEntity.ok().build();
     }
-    // Эндпоинт для установки/смены пароля
-    @PutMapping("/profile/password")
-    public ResponseEntity<Void> setPassword(
-            @RequestBody SetPasswordRequest request,
-            Authentication authentication
-    ) {
-        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-        userProfileService.setUserPassword(principal.getId(), request);
-        return ResponseEntity.ok().build();
-    }
 
-    // Эндпоинт для установки email
-    @PutMapping("/profile/email")
-    public ResponseEntity<Void> setEmail(
-            @RequestBody Map<String, String> payload,
-            Authentication authentication
-    ) {
-        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-        String email = payload.get("email");
-        if (email == null || email.isBlank()) {
-            return ResponseEntity.badRequest().build();
-        }
-        userProfileService.setUserEmail(principal.getId(), email);
-        return ResponseEntity.ok().build();
-    }
     // Эндпоинт для получения "библиотеки" промптов
     @GetMapping("/profile/prompts")
     public ResponseEntity<List<UserPromptsDto>> getPrompts(Authentication authentication) {
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
         return ResponseEntity.ok(userProfileService.getUserPrompts(principal.getId()));
     }
-    // Эндпоинт для получения слияния аккаунтов
-    @PostMapping("/profile/merge")
-    public ResponseEntity<Void> mergeAccounts(
-            @RequestBody MergeAccountRequest request,
+
+    // === СВЯЗКА И ОБЪЕДИНЕНИЕ АККАУНТОВ ===
+    @PostMapping("/profile/link-account")
+    public ResponseEntity<Void> linkAccount(
+            @RequestBody LinkAccountRequest request,
             Authentication authentication
     ) {
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
-        userProfileService.mergeAccounts(principal.getId(), request);
-
-        // ВАЖНО: после этого слияния текущий токен становится невалидным,
-        // так как он привязан к удаленному tg_user_id.
-        // Фронтенд должен будет попросить пользователя залогиниться заново.
+        userProfileService.linkAccount(principal.getId(), request);
+        // Фронтенд должен будет попросить пользователя заново получить токен,
+        // так как его userId мог измениться в случае слияния.
         return ResponseEntity.ok().build();
     }
+    // === ПОДПИСКИ ===
+    @PostMapping("/subscriptions")
+    @PreAuthorize("hasRole('USER')")
+    public ResponseEntity<CreatePaymentResponse> createPayment(Authentication authentication) {
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        return ResponseEntity.ok(paymentService.createPayment(principal.getId()));
+    }
+
 }
