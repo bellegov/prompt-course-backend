@@ -30,6 +30,9 @@ public class AdminCourseController {
         section.setTitle(dto.getTitle());
         section.setDescription(dto.getDescription());
         section.setOrderIndex(dto.getOrderIndex());
+        if (dto.getIconId() != null) {
+            section.setIconId(dto.getIconId());
+        }
         Section saved = sectionRepository.save(section);
         return ResponseEntity.ok(saved);
     }
@@ -53,6 +56,10 @@ public class AdminCourseController {
                     section.setTitle(dto.getTitle());
                     section.setDescription(dto.getDescription());
                     section.setOrderIndex(dto.getOrderIndex());
+                    if (dto.getIconId() != null) {
+                        section.setIconId(dto.getIconId());
+                    }
+
                     return ResponseEntity.ok(sectionRepository.save(section));
                 })
                 .orElse(ResponseEntity.notFound().build());

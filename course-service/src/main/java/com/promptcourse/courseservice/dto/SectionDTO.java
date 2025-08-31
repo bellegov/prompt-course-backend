@@ -6,4 +6,5 @@ public class SectionDTO {
     private String title;
     private String description;
     private int orderIndex;
+    private Integer iconId;
 }

@@ -107,6 +107,7 @@ public class CourseViewService {
                 .testId(testId)
                 .progressPercentage(safeProgress.getProgressPercentage())
                 .isUnlocked(isSectionUnlocked)
+                .iconId(section.getIconId())
                 .build();
     }
 

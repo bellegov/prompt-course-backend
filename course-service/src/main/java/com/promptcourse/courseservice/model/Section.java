@@ -18,4 +18,7 @@ public class Section {
     @OneToMany(mappedBy = "section", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<Chapter> chapters;
+
+    @Column(nullable = false, columnDefinition = "INT DEFAULT 1")
+    private Integer iconId = 1;
 }

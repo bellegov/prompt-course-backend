@@ -21,6 +21,7 @@ public class CourseOutlineDto {
         private Long testId; // <-- ДОБАВЛЕНО: ID теста для этого раздела (или null)
         private int progressPercentage;
         private boolean isUnlocked;
+        private Integer iconId;
     }
 
     @Data
