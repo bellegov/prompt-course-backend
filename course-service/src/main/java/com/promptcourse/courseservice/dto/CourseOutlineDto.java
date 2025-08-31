@@ -2,10 +2,12 @@ package com.promptcourse.courseservice.dto;
 
 import lombok.Builder;
 import lombok.Data;
+
+import java.io.Serializable;
 import java.util.List;
 @Data
 @Builder
-public class CourseOutlineDto {
+public class CourseOutlineDto implements Serializable {
     private List<SectionOutlineDto> sections;
     private int livesLeft;
     private String recoveryTimeLeft;
@@ -13,7 +15,7 @@ public class CourseOutlineDto {
 
     @Data
     @Builder
-    public static class SectionOutlineDto {
+    public static class SectionOutlineDto implements Serializable {
         private Long id;
         private String title;
         private String description;
@@ -26,7 +28,7 @@ public class CourseOutlineDto {
 
     @Data
     @Builder
-    public static class ChapterOutlineDto {
+    public static class ChapterOutlineDto implements Serializable {
         private Long id;
         private String title;
         private Long testId;
@@ -36,7 +38,7 @@ public class CourseOutlineDto {
 
     @Data
     @Builder
-    public static class LectureOutlineDto {
+    public static class LectureOutlineDto implements Serializable {
         private Long id;
         private String title;
         private Long testId;

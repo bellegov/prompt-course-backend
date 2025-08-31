@@ -13,6 +13,8 @@ import com.promptcourse.courseservice.repository.LectureRepository;
 import com.promptcourse.courseservice.repository.SectionRepository;
 import com.promptcourse.courseservice.repository.TestRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class CourseViewService {
 
     private final SectionRepository sectionRepository;
@@ -30,7 +33,12 @@ public class CourseViewService {
     private final TestRepository testRepository;
     private final ProgressServiceClient progressServiceClient;
 
+    // --- ДОБАВЛЯЕМ АННОТАЦИЮ ---
+    // "outlineCache" - это имя нашего кэша
+    // key = "#userId" - ключ, по которому будут сохраняться данные (ID пользователя)
+    @Cacheable(value = "outlineCache", key = "#userId")
     public CourseOutlineDto getCourseOutline(Long userId, boolean isSubscribed) {
+        log.info("--- Cache MISS! Calculating outline for userId: {} ---", userId);
         // 1. Получаем "чистую" структуру курса, отсортированную по orderIndex
         List<Section> sections = sectionRepository.findAllByOrderByOrderIndexAsc();
 

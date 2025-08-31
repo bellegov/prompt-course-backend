@@ -101,6 +101,13 @@ services:
       SPRING_DATASOURCE_USERNAME: ${PROGRESS_DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${PROGRESS_DB_PASSWORD}
       APP_JWT_SECRET: ${APP_JWT_SECRET}
+
+  # --- НОВЫЙ СЕРВИС: Кэш ---
+  redis:
+    image: redis:7-alpine
+    container_name: redis-cache
+    ports:
+      - "6379:6379" # Стандартный порт Redis    
       
   # --- ВСПОМОГАТЕЛЬНЫЕ ИНСТРУМЕНТЫ ---
   zipkin:
