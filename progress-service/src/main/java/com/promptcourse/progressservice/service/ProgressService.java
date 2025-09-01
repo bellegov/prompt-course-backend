@@ -7,6 +7,8 @@ import com.promptcourse.progressservice.repository.UserLifeStatusRepository;
 import com.promptcourse.progressservice.repository.UserProgressRepository;
 import com.promptcourse.progressservice.repository.CompletedTestRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ProgressService {
 
     private final UserProgressRepository progressRepository;
@@ -27,38 +30,47 @@ public class ProgressService {
     private final CourseServiceClient courseServiceClient;
     private final CompletedTestRepository completedTestRepository;
     private final UserStatsService userStatsService;
+    private final KafkaTemplate<String, Object> kafkaTemplate;
 
     private static final int MAX_LIVES = 3;
     private static final int COOLDOWN_HOURS = 3;
 
-    @Transactional // <-- Важная аннотация
+    @Transactional
     public void markLectureAsCompleted(Long userId, MarkCompletedRequest request) {
-        // 1. Получаем инфо о лекции от course-service
-        SectionForProgressDto.LectureForProgressDto lectureInfo = courseServiceClient.getLectureInfo(request.getLectureId());
+        // 1. Проверяем, была ли лекция уже пройдена РАНЬШЕ.
+        boolean alreadyCompleted = !progressRepository.findByUserIdAndLectureIdIn(userId, Set.of(request.getLectureId())).isEmpty();
 
-        // 2. Если у лекции есть тест, проверяем, был ли он сдан
+        // 2. Проверяем все условия (тест и т.д.)
+        SectionForProgressDto.LectureForProgressDto lectureInfo = courseServiceClient.getLectureInfo(request.getLectureId());
         if (lectureInfo.getTestId() != null) {
             Long testId = lectureInfo.getTestId();
             boolean testWasPassed = completedTestRepository.existsByUserIdAndTestId(userId, testId);
             if (!testWasPassed) {
                 throw new IllegalStateException("Cannot complete lecture with an unpassed test. Test ID: " + testId);
             }
-            // 3. Удаляем "временный пропуск" о сдаче теста
             completedTestRepository.findByUserIdAndTestId(userId, testId).ifPresent(completedTestRepository::delete);
         }
 
-        // 4. Сохраняем прогресс по лекции
-        if (!progressRepository.findByUserIdAndLectureIdIn(userId, Set.of(request.getLectureId())).isEmpty()) {
-            return; // Лекция уже пройдена
+        // 3. Если лекция еще НЕ была пройдена, сохраняем прогресс и увеличиваем счетчик.
+        if (!alreadyCompleted) {
+            UserProgress progress = UserProgress.builder()
+                    .userId(userId)
+                    .lectureId(request.getLectureId())
+                    .sectionId(request.getSectionId())
+                    .build();
+            progressRepository.save(progress);
+
+            userStatsService.incrementLecturesCompleted(userId);
         }
 
-        UserProgress progress = UserProgress.builder()
-                .userId(userId)
-                .lectureId(request.getLectureId())
-                .sectionId(request.getSectionId())
-                .build();
-        progressRepository.save(progress);
-        userStatsService.incrementLecturesCompleted(userId);
+        // 4. Отправляем событие в Kafka в ЛЮБОМ СЛУЧАЕ.
+        // Это важно, так как кэш мог устареть по другой причине, и его нужно сбросить.
+        try {
+            kafkaTemplate.send("cache-invalidation", userId.toString(), new CacheInvalidationEvent(userId));
+            log.info("Sent cache invalidation event for userId: {}", userId);
+        } catch (Exception e) {
+            log.error("Failed to send cache invalidation event for userId: {}", userId, e);
+        }
     }
 
     public UserProgressResponse getUserProgress(Long userId, Long sectionId, boolean isSubscribed) {

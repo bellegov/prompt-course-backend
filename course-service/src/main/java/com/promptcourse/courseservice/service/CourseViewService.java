@@ -14,6 +14,7 @@ import com.promptcourse.courseservice.repository.SectionRepository;
 import com.promptcourse.courseservice.repository.TestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
@@ -85,6 +86,14 @@ public class CourseViewService {
                 .recoveryTimeLeft(recoveryTimeLeft)
                 .totalCourseProgress(totalCourseProgress)
                 .build();
+    }
+    // --- НОВЫЙ МЕТОД ДЛЯ ИНВАЛИДАЦИИ ---
+    // allEntries = false означает, что будет удалена только запись по конкретному ключу
+    @CacheEvict(value = "outlineCache", key = "#userId")
+    public void clearOutlineCacheForUser(Long userId) {
+        // Этот метод намеренно пустой.
+        // Вся магия происходит в аннотации.
+        log.info("--- Clearing outline cache for userId: {} ---", userId);
     }
 
     public LectureContentDto getLectureContent(Long lectureId) {
