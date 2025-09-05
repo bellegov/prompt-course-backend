@@ -71,6 +71,7 @@ services:
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       APP_JWT_SECRET: ${APP_JWT_SECRET}
       APP_JWT_EXPIRATION_MS: ${APP_JWT_EXPIRATION_MS}
+      APP_FRONTEND_URL: ${APP_FRONTEND_URL}
 
   course-service:
     build: ./course-service
