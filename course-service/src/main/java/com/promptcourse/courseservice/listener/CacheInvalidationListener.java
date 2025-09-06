@@ -17,7 +17,6 @@ public class CacheInvalidationListener {
     // когда в топик "cache-invalidation" приходит новое сообщение.
     @KafkaListener(topics = "cache-invalidation", groupId = "course-service-group")
     public void handleCacheInvalidation(CacheInvalidationEvent event) {
-        log.info("Received cache invalidation event for userId: {}", event.getUserId());
         courseViewService.clearOutlineCacheForUser(event.getUserId());
     }
 }

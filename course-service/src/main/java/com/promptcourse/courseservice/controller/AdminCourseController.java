@@ -4,6 +4,9 @@ import com.promptcourse.courseservice.dto.*;
 import com.promptcourse.courseservice.model.*;
 import com.promptcourse.courseservice.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.cache.CacheManager;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,6 +24,8 @@ public class AdminCourseController {
     private final LectureRepository lectureRepository;
     private final TestRepository testRepository;
     private final PromptRepository promptRepository;
+    private final CacheManager cacheManager;
+    private static final Logger log = LoggerFactory.getLogger(AdminCourseController.class);
 
     // === УПРАВЛЕНИЕ РАЗДЕЛАМИ ===
 
@@ -34,6 +39,7 @@ public class AdminCourseController {
             section.setIconId(dto.getIconId());
         }
         Section saved = sectionRepository.save(section);
+        clearAllOutlineCaches();
         return ResponseEntity.ok(saved);
     }
 
@@ -51,6 +57,7 @@ public class AdminCourseController {
 
     @PutMapping("/sections/{sectionId}")
     public ResponseEntity<Section> updateSection(@PathVariable Long sectionId, @RequestBody SectionDTO dto) {
+        clearAllOutlineCaches();
         return sectionRepository.findById(sectionId)
                 .map(section -> {
                     section.setTitle(dto.getTitle());
@@ -71,6 +78,7 @@ public class AdminCourseController {
             return ResponseEntity.notFound().build();
         }
         sectionRepository.deleteById(sectionId);
+        clearAllOutlineCaches();
         return ResponseEntity.noContent().build();
     }
 
@@ -78,6 +86,7 @@ public class AdminCourseController {
 
     @PostMapping("/sections/{sectionId}/chapters")
     public ResponseEntity<Chapter> createChapter(@PathVariable Long sectionId, @RequestBody ChapterDTO dto) {
+        clearAllOutlineCaches();
         return sectionRepository.findById(sectionId)
                 .map(section -> {
                     Chapter chapter = new Chapter();
@@ -99,6 +108,7 @@ public class AdminCourseController {
 
     @PutMapping("/chapters/{chapterId}")
     public ResponseEntity<Chapter> updateChapter(@PathVariable Long chapterId, @RequestBody ChapterDTO dto) {
+        clearAllOutlineCaches();
         return chapterRepository.findById(chapterId)
                 .map(chapter -> {
                     chapter.setTitle(dto.getTitle());
@@ -114,6 +124,7 @@ public class AdminCourseController {
             return ResponseEntity.notFound().build();
         }
         chapterRepository.deleteById(chapterId);
+        clearAllOutlineCaches();
         return ResponseEntity.noContent().build();
     }
 
@@ -121,6 +132,7 @@ public class AdminCourseController {
 
     @PostMapping("/chapters/{chapterId}/lectures")
     public ResponseEntity<Lecture> createLecture(@PathVariable Long chapterId, @RequestBody LectureDTO dto) {
+        clearAllOutlineCaches();
         return chapterRepository.findById(chapterId)
                 .map(chapter -> {
                     Lecture lecture = new Lecture();
@@ -144,6 +156,7 @@ public class AdminCourseController {
 
     @PutMapping("/lectures/{lectureId}")
     public ResponseEntity<Lecture> updateLecture(@PathVariable Long lectureId, @RequestBody LectureDTO dto) {
+        clearAllOutlineCaches();
         return lectureRepository.findById(lectureId)
                 .map(lecture -> {
                     lecture.setTitle(dto.getTitle());
@@ -161,6 +174,7 @@ public class AdminCourseController {
             return ResponseEntity.notFound().build();
         }
         lectureRepository.deleteById(lectureId);
+        clearAllOutlineCaches();
         return ResponseEntity.noContent().build();
     }
 
@@ -168,6 +182,7 @@ public class AdminCourseController {
 
     @PostMapping("/lectures/{lectureId}/prompts")
     public ResponseEntity<Prompt> addPromptToLecture(@PathVariable Long lectureId, @RequestBody PromptDto dto) {
+        clearAllOutlineCaches();
         return lectureRepository.findById(lectureId)
                 .map(lecture -> {
                     Prompt prompt = new Prompt();
@@ -188,6 +203,7 @@ public class AdminCourseController {
 
     @PutMapping("/prompts/{promptId}")
     public ResponseEntity<Prompt> updatePrompt(@PathVariable Long promptId, @RequestBody PromptDto dto) {
+        clearAllOutlineCaches();
         return promptRepository.findById(promptId)
                 .map(prompt -> {
                     prompt.setTitle(dto.getTitle());
@@ -203,12 +219,14 @@ public class AdminCourseController {
             return ResponseEntity.notFound().build();
         }
         promptRepository.deleteById(promptId);
+        clearAllOutlineCaches();
         return ResponseEntity.noContent().build();
     }
 
     // === УПРАВЛЕНИЕ ТЕСТАМИ ===
     @PostMapping("/lectures/{lectureId}/test")
     public ResponseEntity<Test> createTestForLecture(@PathVariable Long lectureId, @RequestBody CreateTestRequest request) {
+        clearAllOutlineCaches();
         return lectureRepository.findById(lectureId)
                 .map(lecture -> {
                     Test test = buildTestFromRequest(request);
@@ -223,6 +241,7 @@ public class AdminCourseController {
         Chapter chapter = chapterRepository.findById(chapterId).orElseThrow(() -> new RuntimeException("Chapter not found"));
         Test test = buildTestFromRequest(request);
         test.setChapter(chapter);
+        clearAllOutlineCaches();
         return ResponseEntity.ok(testRepository.save(test));
     }
 
@@ -231,6 +250,7 @@ public class AdminCourseController {
         Section section = sectionRepository.findById(sectionId).orElseThrow(() -> new RuntimeException("Section not found"));
         Test test = buildTestFromRequest(request);
         test.setSection(section);
+        clearAllOutlineCaches();
         return ResponseEntity.ok(testRepository.save(test));
     }
 
@@ -241,6 +261,7 @@ public class AdminCourseController {
 
     @PutMapping("/tests/{testId}")
     public ResponseEntity<Test> updateTest(@PathVariable Long testId, @RequestBody CreateTestRequest request) {
+        clearAllOutlineCaches();
         return testRepository.findById(testId)
                 .map(existingTest -> {
                     if (request.getPassingScore() > request.getQuestions().size() || request.getPassingScore() <= 0) {
@@ -263,6 +284,7 @@ public class AdminCourseController {
     public ResponseEntity<Void> deleteTest(@PathVariable Long testId) {
         if (!testRepository.existsById(testId)) return ResponseEntity.notFound().build();
         testRepository.deleteById(testId);
+        clearAllOutlineCaches();
         return ResponseEntity.noContent().build();
     }
 
@@ -289,6 +311,16 @@ public class AdminCourseController {
             test.getQuestions().add(question);
         });
         return test;
+    }
+    private void clearAllOutlineCaches() {
+        try {
+            // Находим кэш по имени и полностью его очищаем
+            cacheManager.getCache("outlineCache").clear();
+            log.info("--- Successfully cleared outlineCache ---");
+        } catch (Exception e) {
+            // Логируем ошибку, если кэш не найден или произошел сбой
+            log.error("--- Failed to clear outlineCache ---", e);
+        }
     }
 
 }

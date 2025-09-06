@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @Table(name = "password_reset_tokens")
 public class PasswordResetToken {
 
-    private static final int EXPIRATION_MINUTES = 15; // Токен будет действовать 15 минут
+    private static final int EXPIRATION_MINUTES = 15;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

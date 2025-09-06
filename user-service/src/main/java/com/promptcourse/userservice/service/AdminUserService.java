@@ -39,8 +39,6 @@ public class AdminUserService {
 
         // ---ПРОВЕРКА ---
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
-
-            // ЭТОТ КОД ВНУТРИ IF ВЫПОЛНЯЕТСЯ, ТОЛЬКО ЕСЛИ УСЛОВИЕ ВЫШЕ ВЕРНО:
             if (userRepository.existsByEmail(request.getEmail())) {
                 throw new IllegalStateException("Email " + request.getEmail() + " is already taken.");
             }

@@ -13,10 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/admin/users") // Общий путь для всех админских операций с пользователями
+@RequestMapping("/admin/users")
 @RequiredArgsConstructor
-// ВАЖНО: Эта аннотация разрешает доступ к контроллеру только пользователям с ролью ADMIN
-// Чтобы она заработала, нужно будет сделать небольшую донастройку.
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 

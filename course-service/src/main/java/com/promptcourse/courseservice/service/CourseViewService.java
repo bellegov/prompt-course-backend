@@ -37,9 +37,9 @@ public class CourseViewService {
     // --- ДОБАВЛЯЕМ АННОТАЦИЮ ---
     // "outlineCache" - это имя нашего кэша
     // key = "#userId" - ключ, по которому будут сохраняться данные (ID пользователя)
-    @Cacheable(value = "outlineCache", key = "#userId")
+    @Cacheable(value = "outlineCache", key = "#userId + '-' + #isSubscribed")
     public CourseOutlineDto getCourseOutline(Long userId, boolean isSubscribed) {
-        log.info("--- Cache MISS! Calculating outline for userId: {} ---", userId);
+        //log.info("--- Cache MISS! Calculating outline for userId: {} ---", userId);
         // 1. Получаем "чистую" структуру курса, отсортированную по orderIndex
         List<Section> sections = sectionRepository.findAllByOrderByOrderIndexAsc();
 

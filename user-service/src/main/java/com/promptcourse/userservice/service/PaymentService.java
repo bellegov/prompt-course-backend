@@ -28,8 +28,9 @@ public class PaymentService {
 
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
-    private final JavaMailSender mailSender; // Наш "почтальон"
+   // private final JavaMailSender mailSender;
     private final RestTemplate restTemplate;
+    private final EmailService emailService;
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
     @Value("${yoomoney.shop-id}")
@@ -37,12 +38,13 @@ public class PaymentService {
     @Value("${yoomoney.secret-key}")
     private String secretKey;
 
-    public PaymentService(UserRepository userRepository, SubscriptionRepository subscriptionRepository, JavaMailSender mailSender) {
+    public PaymentService(UserRepository userRepository, SubscriptionRepository subscriptionRepository, EmailService emailService) {
         this.userRepository = userRepository;
         this.subscriptionRepository = subscriptionRepository;
-        this.mailSender = mailSender;
-        // Создаем RestTemplate один раз при старте
+        //this.mailSender = mailSender;
+        this.emailService = emailService;
         this.restTemplate = new RestTemplate();
+
     }
     // Метод, который будет вызван после того, как поля shopId и secretKey будут установлены
     @PostConstruct
@@ -115,7 +117,7 @@ public class PaymentService {
 
         // --- ИСПРАВЛЕНИЕ: Оборачиваем отправку письма в try-catch ---
         try {
-            sendReceipt(user, payment);
+            emailService.sendReceipt(user, payment);
         } catch (MailException e) {
             // Если отправка письма не удалась, мы не "роняем" всю транзакцию.
             // Мы просто логируем ошибку. Подписка при этом останется сохраненной.
@@ -123,23 +125,4 @@ public class PaymentService {
         }
     }
 
-    private void sendReceipt(User user, YooMoneyNotification.PaymentObject payment) {
-        if (user.getEmail() == null) {
-            // Не можем отправить квитанцию, если нет почты
-            // Здесь можно добавить логирование
-            return;
-        }
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom("noreply@promptcourse.com"); // Адрес, который вы подтвердите в SendGrid
-        message.setTo(user.getEmail());
-        message.setSubject("Квитанция об оплате подписки");
-        message.setText(String.format(
-                "Здравствуйте, %s!\n\nВы успешно оплатили подписку на 1 месяц.\nСумма: %s %s\nID транзакции: %s\n\nСпасибо, что выбрали нас!",
-                user.getNickname(),
-                payment.getAmount().getValue(),
-                payment.getAmount().getCurrency(),
-                payment.getId()
-        ));
-        mailSender.send(message);
-    }
 }

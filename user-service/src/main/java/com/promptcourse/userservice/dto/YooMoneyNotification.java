@@ -8,7 +8,7 @@ import java.util.Map;
 public class YooMoneyNotification {
     private String type;
     private String event;
-    @JsonProperty("object") // "object" - зарезервированное слово, используем аннотацию
+    @JsonProperty("object")
     private PaymentObject object;
 
     @Data
@@ -16,9 +16,9 @@ public class YooMoneyNotification {
         private String id;
         private String status;
         private Amount amount;
-        private Map<String, String> metadata; // Сюда мы будем класть наш userId
+        private Map<String, String> metadata;
         private boolean paid;
-        // ... можно добавить другие поля из документации YooMoney, если понадобятся
+
     }
 
     @Data

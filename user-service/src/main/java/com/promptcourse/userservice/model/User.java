@@ -46,7 +46,6 @@ public class User implements UserDetails {
 
     @Override
     public String getUsername() {
-        // Если есть email - он и есть username. Иначе - ID пользователя.
         return email != null ? email : id.toString();
     }
 

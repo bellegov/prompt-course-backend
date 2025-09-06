@@ -34,7 +34,6 @@ public class TestService {
     public TestResultDto submitTest(Long testId, Long userId, boolean isSubscribed, SubmitTestRequestDto submission) {
 
         // 1. ПРОВЕРКА РАЗРЕШЕНИЯ
-        log.info("Checking attempt status for userId: {}", userId);
         AttemptStatusResponse status = progressServiceClient.getAttemptStatus(userId, isSubscribed);
 
         if (!status.isCanAttempt()) {

@@ -45,8 +45,6 @@ public class PasswordResetService {
         String token = UUID.randomUUID().toString();
         PasswordResetToken resetToken = new PasswordResetToken(token, user);
         tokenRepository.save(resetToken);
-
-        // Отправляем "фейковое" или настоящее письмо
         sendResetEmail(user, token);
     }
 
