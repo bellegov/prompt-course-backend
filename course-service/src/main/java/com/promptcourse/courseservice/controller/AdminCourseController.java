@@ -222,96 +222,130 @@ public class AdminCourseController {
         clearAllOutlineCaches();
         return ResponseEntity.noContent().build();
     }
+// === УПРАВЛЕНИЕ ТЕСТАМИ (НОВАЯ ВЕРСИЯ) ===
 
-    // === УПРАВЛЕНИЕ ТЕСТАМИ ===
+    /**
+     * Создает или обновляет тест для конкретной лекции.
+     * Если тест для лекции уже существует, он будет полностью заменен новыми данными.
+     * Если не существует, будет создан новый.
+     */
     @PostMapping("/lectures/{lectureId}/test")
-    public ResponseEntity<Test> createTestForLecture(@PathVariable Long lectureId, @RequestBody CreateTestRequest request) {
+    public ResponseEntity<Test> createOrUpdateTestForLecture(@PathVariable Long lectureId, @RequestBody CreateTestRequest request) {
+        Lecture lecture = lectureRepository.findById(lectureId)
+                .orElseThrow(() -> new RuntimeException("Lecture not found with id: " + lectureId));
+
+        Test test = testRepository.findByLectureId(lectureId).orElse(new Test());
+        updateTestDataFromRequest(test, request);
+        test.setLecture(lecture);
+        test.setChapter(null); // Убедимся, что тест привязан только к одному элементу
+        test.setSection(null);
+
+        Test savedTest = testRepository.save(test);
         clearAllOutlineCaches();
-        return lectureRepository.findById(lectureId)
-                .map(lecture -> {
-                    Test test = buildTestFromRequest(request);
-                    test.setLecture(lecture);
-                    return ResponseEntity.ok(testRepository.save(test));
-                })
-                .orElse(ResponseEntity.notFound().build());
+        return ResponseEntity.ok(savedTest);
     }
 
+    /**
+     * Создает или обновляет тест для конкретной главы.
+     */
     @PostMapping("/chapters/{chapterId}/test")
-    public ResponseEntity<Test> createTestForChapter(@PathVariable Long chapterId, @RequestBody CreateTestRequest request) {
-        Chapter chapter = chapterRepository.findById(chapterId).orElseThrow(() -> new RuntimeException("Chapter not found"));
-        Test test = buildTestFromRequest(request);
+    public ResponseEntity<Test> createOrUpdateTestForChapter(@PathVariable Long chapterId, @RequestBody CreateTestRequest request) {
+        Chapter chapter = chapterRepository.findById(chapterId)
+                .orElseThrow(() -> new RuntimeException("Chapter not found with id: " + chapterId));
+        Test test = testRepository.findByChapterId(chapterId).orElse(new Test());
+        updateTestDataFromRequest(test, request);
         test.setChapter(chapter);
+        test.setLecture(null);
+        test.setSection(null);
+
+        Test savedTest = testRepository.save(test);
         clearAllOutlineCaches();
-        return ResponseEntity.ok(testRepository.save(test));
+        return ResponseEntity.ok(savedTest);
     }
 
+    /**
+     * Создает или обновляет тест для конкретного раздела.
+     */
     @PostMapping("/sections/{sectionId}/test")
-    public ResponseEntity<Test> createTestForSection(@PathVariable Long sectionId, @RequestBody CreateTestRequest request) {
-        Section section = sectionRepository.findById(sectionId).orElseThrow(() -> new RuntimeException("Section not found"));
-        Test test = buildTestFromRequest(request);
+    public ResponseEntity<Test> createOrUpdateTestForSection(@PathVariable Long sectionId, @RequestBody CreateTestRequest request) {
+        Section section = sectionRepository.findById(sectionId)
+                .orElseThrow(() -> new RuntimeException("Section not found with id: " + sectionId));
+        Test test = testRepository.findBySectionId(sectionId).orElse(new Test());
+        updateTestDataFromRequest(test, request);
         test.setSection(section);
+        test.setLecture(null);
+        test.setChapter(null);
+
+        Test savedTest = testRepository.save(test);
         clearAllOutlineCaches();
-        return ResponseEntity.ok(testRepository.save(test));
+        return ResponseEntity.ok(savedTest);
     }
 
+    /**
+     * Получает существующий тест по его уникальному ID.
+     * Необходимо фронтенду для заполнения формы редактирования.
+     */
     @GetMapping("/tests/{testId}")
     public ResponseEntity<Test> getTestById(@PathVariable Long testId) {
-        return testRepository.findById(testId).map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
-    }
-
-    @PutMapping("/tests/{testId}")
-    public ResponseEntity<Test> updateTest(@PathVariable Long testId, @RequestBody CreateTestRequest request) {
-        clearAllOutlineCaches();
         return testRepository.findById(testId)
-                .map(existingTest -> {
-                    if (request.getPassingScore() > request.getQuestions().size() || request.getPassingScore() <= 0) {
-                        throw new IllegalArgumentException("Invalid passing score value.");
-                    }
-                    existingTest.setTitle(request.getTitle());
-                    existingTest.setPassingScore(request.getPassingScore());
-                    existingTest.getQuestions().clear();
-                    Test updatedTestModel = buildTestFromRequest(request);
-                    updatedTestModel.getQuestions().forEach(q -> {
-                        q.setTest(existingTest);
-                        existingTest.getQuestions().add(q);
-                    });
-                    return ResponseEntity.ok(testRepository.save(existingTest));
-                })
+                .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    /**
+     * Удаляет тест по его уникальному ID.
+     */
     @DeleteMapping("/tests/{testId}")
     public ResponseEntity<Void> deleteTest(@PathVariable Long testId) {
-        if (!testRepository.existsById(testId)) return ResponseEntity.notFound().build();
+        if (!testRepository.existsById(testId)) {
+            return ResponseEntity.notFound().build();
+        }
         testRepository.deleteById(testId);
         clearAllOutlineCaches();
         return ResponseEntity.noContent().build();
     }
 
-    private Test buildTestFromRequest(CreateTestRequest request) {
-        Test test = new Test();
+    /**
+     * Приватный метод для обновления данных теста из DTO.
+     * Вынесен, чтобы не дублировать код.
+     */
+    private void updateTestDataFromRequest(Test test, CreateTestRequest request) {
         test.setTitle(request.getTitle());
-        if (request.getPassingScore() > request.getQuestions().size() || request.getPassingScore() <= 0) {
-            throw new IllegalArgumentException("Invalid passing score value.");
+
+        if (request.getPassingScore() == null || request.getPassingScore() <= 0 || (request.getQuestions() != null && request.getPassingScore() > request.getQuestions().size())) {
+            throw new IllegalArgumentException("Invalid passing score value. It must be between 1 and the number of questions.");
         }
         test.setPassingScore(request.getPassingScore());
-        test.setQuestions(new ArrayList<>());
-        request.getQuestions().forEach(qDto -> {
-            Question question = new Question();
-            question.setQuestionText(qDto.getQuestionText());
-            question.setTest(test);
-            question.setAnswers(new ArrayList<>());
-            qDto.getAnswers().forEach(aDto -> {
-                Answer answer = new Answer();
-                answer.setAnswerText(aDto.getAnswerText());
-                answer.setCorrect(aDto.getIsCorrect() != null && aDto.getIsCorrect());
-                answer.setQuestion(question);
-                question.getAnswers().add(answer);
+
+        // Полностью очищаем старые вопросы, чтобы избежать дубликатов
+        if (test.getQuestions() != null) {
+            test.getQuestions().clear();
+        } else {
+            test.setQuestions(new ArrayList<>());
+        }
+
+        // Создаем новые вопросы на основе DTO
+        if (request.getQuestions() != null) {
+            request.getQuestions().forEach(qDto -> {
+                Question question = new Question();
+                question.setQuestionText(qDto.getQuestionText());
+                question.setTest(test);
+                question.setAnswers(new ArrayList<>());
+
+                if (qDto.getAnswers() != null) {
+                    qDto.getAnswers().forEach(aDto -> {
+                        Answer answer = new Answer();
+                        answer.setAnswerText(aDto.getAnswerText());
+                        answer.setCorrect(aDto.getIsCorrect() != null && aDto.getIsCorrect());
+                        answer.setQuestion(question);
+                        question.getAnswers().add(answer);
+                    });
+                }
+                test.getQuestions().add(question);
             });
-            test.getQuestions().add(question);
-        });
-        return test;
+        }
     }
+
     private void clearAllOutlineCaches() {
         try {
             // Находим кэш по имени и полностью его очищаем

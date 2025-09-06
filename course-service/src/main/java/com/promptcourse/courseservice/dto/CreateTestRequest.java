@@ -7,7 +7,7 @@ import java.util.List;
 public class CreateTestRequest {
     private String title;
     private List<QuestionDTO> questions;
-    private int passingScore;
+    private Integer passingScore;
 
     @Data
     public static class QuestionDTO {
