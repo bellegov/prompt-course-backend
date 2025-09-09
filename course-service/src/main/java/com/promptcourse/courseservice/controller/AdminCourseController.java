@@ -305,6 +305,35 @@ public class AdminCourseController {
         return ResponseEntity.noContent().build();
     }
 
+    // --- НОВЫЙ МЕТОД, ПРЕДЛОЖЕННЫЙ ФРОНТЕНДОМ ---
+    /**
+     * Находит и возвращает тест, привязанный к конкретной лекции.
+     * Необходимо для фронтенда, чтобы получить testId для операций редактирования и удаления.
+     */
+    @GetMapping("/lectures/{lectureId}/test")
+    public ResponseEntity<Test> getTestByLectureId(@PathVariable Long lectureId) {
+        return testRepository.findByLectureId(lectureId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // --- И АНАЛОГИЧНЫЕ МЕТОДЫ ДЛЯ ГЛАВ И РАЗДЕЛОВ ---
+    // (чтобы сразу закрыть эту проблему для всех уровней)
+
+    @GetMapping("/chapters/{chapterId}/test")
+    public ResponseEntity<Test> getTestByChapterId(@PathVariable Long chapterId) {
+        return testRepository.findByChapterId(chapterId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/sections/{sectionId}/test")
+    public ResponseEntity<Test> getTestBySectionId(@PathVariable Long sectionId) {
+        return testRepository.findBySectionId(sectionId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     /**
      * Приватный метод для обновления данных теста из DTO.
      * Вынесен, чтобы не дублировать код.
