@@ -8,8 +8,8 @@ import com.promptcourse.progressservice.repository.UserProgressRepository;
 import com.promptcourse.progressservice.repository.CompletedTestRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
@@ -30,47 +30,59 @@ public class ProgressService {
     private final CourseServiceClient courseServiceClient;
     private final CompletedTestRepository completedTestRepository;
     private final UserStatsService userStatsService;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+
 
     private static final int MAX_LIVES = 3;
     private static final int COOLDOWN_HOURS = 3;
 
-    @Transactional
-    public void markLectureAsCompleted(Long userId, MarkCompletedRequest request) {
-        // 1. Проверяем, была ли лекция уже пройдена РАНЬШЕ.
+    public void markLectureAsCompleted(Long userId, MarkCompletedRequest request, boolean isSubscribed) {
+        // 1. Сохраняем прогресс в отдельной, независимой транзакции.
+        saveProgressInternal(userId, request, isSubscribed);
+
+        // 2. И ТОЛЬКО ПОСЛЕ того, как транзакция сохранения успешно завершилась,
+        // мы сбрасываем кэш.
+        try {
+            courseServiceClient.clearOutlineCache(userId, isSubscribed);
+            log.info("Successfully requested cache invalidation for user {}", userId);
+        } catch (Exception e) {
+            log.error("Failed to request cache invalidation for user {}. The user's view might be stale.", userId, e);
+        }
+    }
+
+    // --- ВСПОМОГАТЕЛЬНЫЙ ВНУТРЕННИЙ МЕТОД ДЛЯ ТРАНЗАКЦИИ ---
+    // Propagation.REQUIRES_NEW означает: "Этот метод ВСЕГДА должен запускаться в своей собственной, новой транзакции".
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void saveProgressInternal(Long userId, MarkCompletedRequest request, boolean isSubscribed) {
+        // Вся наша старая логика проверки и сохранения теперь здесь
+
         boolean alreadyCompleted = !progressRepository.findByUserIdAndLectureIdIn(userId, Set.of(request.getLectureId())).isEmpty();
 
-        // 2. Проверяем все условия (тест и т.д.)
+        if (alreadyCompleted) {
+            log.warn("User {} attempted to complete an already completed lecture {}", userId, request.getLectureId());
+            return; // Выходим, если уже пройдено
+        }
+
+        UserProgressResponse currentProgress = this.getUserProgress(userId, request.getSectionId(), isSubscribed);
+        LectureState currentState = currentProgress.getLectureStates().get(request.getLectureId());
+
+        if (currentState != LectureState.UNLOCKED) {
+            throw new IllegalStateException("Cannot complete a lecture that is not currently unlocked.");
+        }
+
         SectionForProgressDto.LectureForProgressDto lectureInfo = courseServiceClient.getLectureInfo(request.getLectureId());
         if (lectureInfo.getTestId() != null) {
             Long testId = lectureInfo.getTestId();
-            boolean testWasPassed = completedTestRepository.existsByUserIdAndTestId(userId, testId);
-            if (!testWasPassed) {
+            if (!completedTestRepository.existsByUserIdAndTestId(userId, testId)) {
                 throw new IllegalStateException("Cannot complete lecture with an unpassed test. Test ID: " + testId);
             }
             completedTestRepository.findByUserIdAndTestId(userId, testId).ifPresent(completedTestRepository::delete);
         }
 
-        // 3. Если лекция еще НЕ была пройдена, сохраняем прогресс и увеличиваем счетчик.
-        if (!alreadyCompleted) {
-            UserProgress progress = UserProgress.builder()
-                    .userId(userId)
-                    .lectureId(request.getLectureId())
-                    .sectionId(request.getSectionId())
-                    .build();
-            progressRepository.save(progress);
+        UserProgress progress = UserProgress.builder()
+                .userId(userId).lectureId(request.getLectureId()).sectionId(request.getSectionId()).build();
+        progressRepository.save(progress);
 
-            userStatsService.incrementLecturesCompleted(userId);
-        }
-
-        // 4. Отправляем событие в Kafka в ЛЮБОМ СЛУЧАЕ.
-        // Это важно, так как кэш мог устареть по другой причине, и его нужно сбросить.
-        try {
-            kafkaTemplate.send("cache-invalidation", userId.toString(), new CacheInvalidationEvent(userId));
-            log.info("Sent cache invalidation event for userId: {}", userId);
-        } catch (Exception e) {
-            log.error("Failed to send cache invalidation event for userId: {}", userId, e);
-        }
+        userStatsService.incrementLecturesCompleted(userId);
     }
 
     public UserProgressResponse getUserProgress(Long userId, Long sectionId, boolean isSubscribed) {

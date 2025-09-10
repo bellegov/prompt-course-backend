@@ -25,11 +25,14 @@ public class ProgressController {
     @PostMapping("/complete-lecture")
     public ResponseEntity<Void> markLectureCompleted(
             @RequestBody MarkCompletedRequest request,
-            @RequestHeader("X-User-ID") Long userId // <-- Читаем ID из заголовка
+            @RequestHeader("X-User-ID") Long userId,
+            @RequestHeader("X-User-Subscribed") boolean isSubscribed // <-- Он должен получать это
     ) {
-        progressService.markLectureAsCompleted(userId, request);
+        // И передавать дальше
+        progressService.markLectureAsCompleted(userId, request, isSubscribed);
         return ResponseEntity.ok().build();
     }
+
 
     // Внутренний
     @GetMapping("/internal/users/{userId}/completed-lectures")

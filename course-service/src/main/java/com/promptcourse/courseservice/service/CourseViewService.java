@@ -39,7 +39,7 @@ public class CourseViewService {
     // key = "#userId" - ключ, по которому будут сохраняться данные (ID пользователя)
     @Cacheable(value = "outlineCache", key = "#userId + '-' + #isSubscribed")
     public CourseOutlineDto getCourseOutline(Long userId, boolean isSubscribed) {
-        //log.info("--- Cache MISS! Calculating outline for userId: {} ---", userId);
+        log.info(">>> [CACHE MISS] Calculating outline for userId: {}, isSubscribed: {}", userId, isSubscribed);
         // 1. Получаем "чистую" структуру курса, отсортированную по orderIndex
         List<Section> sections = sectionRepository.findAllByOrderByOrderIndexAsc();
 
@@ -87,13 +87,16 @@ public class CourseViewService {
                 .totalCourseProgress(totalCourseProgress)
                 .build();
     }
-    // --- НОВЫЙ МЕТОД ДЛЯ ИНВАЛИДАЦИИ ---
-    // allEntries = false означает, что будет удалена только запись по конкретному ключу
-    @CacheEvict(value = "outlineCache", key = "#userId")
-    public void clearOutlineCacheForUser(Long userId) {
-        // Этот метод намеренно пустой.
-        // Вся магия происходит в аннотации.
-        log.info("--- Clearing outline cache for userId: {} ---", userId);
+    @CacheEvict(value = "outlineCache", key = "#userId + '-true'")
+    public void clearSubscriberCache(Long userId) {
+        // --- ЛОГ №2 ---
+        log.info(">>> [CACHE EVICT] Clearing SUBSCRIBER cache for userId: {}", userId);
+    }
+
+    @CacheEvict(value = "outlineCache", key = "#userId + '-false'")
+    public void clearNonSubscriberCache(Long userId) {
+        // --- ЛОГ №3 ---
+        log.info(">>> [CACHE EVICT] Clearing NON-SUBSCRIBER cache for userId: {}", userId);
     }
 
     public LectureContentDto getLectureContent(Long lectureId) {
