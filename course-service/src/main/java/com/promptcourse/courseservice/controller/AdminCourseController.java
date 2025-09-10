@@ -318,7 +318,6 @@ public class AdminCourseController {
     }
 
     // --- И АНАЛОГИЧНЫЕ МЕТОДЫ ДЛЯ ГЛАВ И РАЗДЕЛОВ ---
-    // (чтобы сразу закрыть эту проблему для всех уровней)
 
     @GetMapping("/chapters/{chapterId}/test")
     public ResponseEntity<Test> getTestByChapterId(@PathVariable Long chapterId) {
