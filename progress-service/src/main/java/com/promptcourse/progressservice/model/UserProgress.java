@@ -5,7 +5,13 @@ import lombok.*;
 
 @Data @Builder @NoArgsConstructor @AllArgsConstructor
 @Entity
-@Table(name = "user_progress", uniqueConstraints = @UniqueConstraint(columnNames = {"userId", "lectureId"}))
+// Добавляем аннотацию @Table с определением индексов
+@Table(name = "user_progress", uniqueConstraints = @UniqueConstraint(columnNames = {"userId", "lectureId"}),
+        indexes = {
+                @Index(name = "idx_userprogress_userid", columnList = "userId"),
+                @Index(name = "idx_userprogress_user_section", columnList = "userId, sectionId")
+        }
+)
 public class UserProgress {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

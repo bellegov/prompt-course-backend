@@ -1,12 +1,14 @@
 package com.promptcourse.progressservice.service;
+import com.promptcourse.progressservice.client.CourseServiceClient;
 import com.promptcourse.progressservice.dto.AttemptStatusResponse;
 import com.promptcourse.progressservice.model.UserLifeStatus;
 import com.promptcourse.progressservice.repository.UserLifeStatusRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AttemptService {
@@ -15,6 +17,7 @@ public class AttemptService {
     private static final int COOLDOWN_HOURS = 3;
 
     private final UserLifeStatusRepository lifeStatusRepository;
+    private final CourseServiceClient courseServiceClient;
 
     // Метод, который проверяет, можно ли пользователю пройти ЛЮБОЙ тест
     public AttemptStatusResponse checkCanAttempt(Long userId, boolean isSubscribed) {
@@ -69,6 +72,15 @@ public class AttemptService {
             lifeStatus.setLives(lifeStatus.getLives() - 1);
             lifeStatusRepository.save(lifeStatus);
         }
+        // После списания жизни, немедленно сбрасываем кэш в course-service
+        try {
+            courseServiceClient.clearOutlineCache(userId,false);
+            log.info("Cache invalidation requested for userId {} after failed attempt.", userId);
+        } catch (Exception e) {
+            log.error("Failed to request cache invalidation for userId {} after failed attempt.", userId, e);
+        }
+        // -------------------------
+
     }
 
     // Вспомогательный метод для получения или создания записи о жизнях
