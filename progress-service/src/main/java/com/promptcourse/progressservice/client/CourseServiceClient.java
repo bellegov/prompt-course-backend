@@ -17,5 +17,5 @@ public interface CourseServiceClient {
     SectionForProgressDto.LectureForProgressDto getLectureInfo(@PathVariable("lectureId") Long lectureId);
 
     @PostMapping("/internal/cache/clear-outline")
-    void clearOutlineCache(@RequestParam("userId") Long userId, @RequestParam("isSubscribed") boolean isSubscribed);
+    void clearOutlineCache(@RequestParam("userId") Long userId);
 }

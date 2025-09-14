@@ -42,7 +42,7 @@ public class ProgressService {
         // 2. И ТОЛЬКО ПОСЛЕ того, как транзакция сохранения успешно завершилась,
         // мы сбрасываем кэш.
         try {
-            courseServiceClient.clearOutlineCache(userId, isSubscribed);
+            courseServiceClient.clearOutlineCache(userId);
             log.info("Successfully requested cache invalidation for user {}", userId);
         } catch (Exception e) {
             log.error("Failed to request cache invalidation for user {}. The user's view might be stale.", userId, e);

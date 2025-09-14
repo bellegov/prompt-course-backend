@@ -1,4 +1,5 @@
 package com.promptcourse.userservice.service;
+import com.promptcourse.userservice.client.CourseServiceClient;
 import com.promptcourse.userservice.dto.CreatePaymentResponse;
 import com.promptcourse.userservice.dto.YooMoneyNotification;
 import com.promptcourse.userservice.model.Subscription;
@@ -31,6 +32,7 @@ public class PaymentService {
    // private final JavaMailSender mailSender;
     private final RestTemplate restTemplate;
     private final EmailService emailService;
+    private final CourseServiceClient courseServiceClient;
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
     @Value("${yoomoney.shop-id}")
@@ -38,12 +40,13 @@ public class PaymentService {
     @Value("${yoomoney.secret-key}")
     private String secretKey;
 
-    public PaymentService(UserRepository userRepository, SubscriptionRepository subscriptionRepository, EmailService emailService) {
+    public PaymentService(UserRepository userRepository, SubscriptionRepository subscriptionRepository, EmailService emailService,CourseServiceClient courseServiceClient) {
         this.userRepository = userRepository;
         this.subscriptionRepository = subscriptionRepository;
         //this.mailSender = mailSender;
         this.emailService = emailService;
         this.restTemplate = new RestTemplate();
+        this.courseServiceClient = courseServiceClient;
 
     }
     // Метод, который будет вызван после того, как поля shopId и secretKey будут установлены
@@ -114,6 +117,15 @@ public class PaymentService {
         subscription.setStatus(SubscriptionStatus.ACTIVE);
 
         subscriptionRepository.save(subscription);
+
+        try {
+            log.info("Subscription activated for userId: {}. Requesting cache invalidation.", userId);
+            courseServiceClient.clearOutlineCache(userId);
+        } catch (Exception e) {
+            // Если course-service недоступен, это не должно ломать активацию подписки.
+            // Просто логируем ошибку.
+            log.error("Failed to request cache invalidation for userId {} after subscription activation.", userId, e);
+        }
 
         // --- ИСПРАВЛЕНИЕ: Оборачиваем отправку письма в try-catch ---
         try {

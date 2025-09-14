@@ -74,7 +74,7 @@ public class AttemptService {
         }
         // После списания жизни, немедленно сбрасываем кэш в course-service
         try {
-            courseServiceClient.clearOutlineCache(userId,false);
+            courseServiceClient.clearOutlineCache(userId);
             log.info("Cache invalidation requested for userId {} after failed attempt.", userId);
         } catch (Exception e) {
             log.error("Failed to request cache invalidation for userId {} after failed attempt.", userId, e);

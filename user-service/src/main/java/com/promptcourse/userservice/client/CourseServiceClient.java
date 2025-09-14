@@ -4,6 +4,7 @@ import com.promptcourse.userservice.dto.course.UserPromptsDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -11,4 +12,7 @@ import java.util.List;
 public interface CourseServiceClient {
     @PostMapping("/internal/prompts/by-lectures")
     List<UserPromptsDto> getPromptsByLectures(@RequestBody List<Long> lectureIds);
+
+    @PostMapping("/internal/cache/clear-outline")
+    void clearOutlineCache(@RequestParam("userId") Long userId);
 }

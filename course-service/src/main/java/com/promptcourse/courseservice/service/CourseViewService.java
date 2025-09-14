@@ -16,6 +16,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -87,16 +88,12 @@ public class CourseViewService {
                 .totalCourseProgress(totalCourseProgress)
                 .build();
     }
-    @CacheEvict(value = "outlineCache", key = "#userId + '-true'")
-    public void clearSubscriberCache(Long userId) {
-        // --- ЛОГ №2 ---
-        log.info(">>> [CACHE EVICT] Clearing SUBSCRIBER cache for userId: {}", userId);
-    }
-
-    @CacheEvict(value = "outlineCache", key = "#userId + '-false'")
-    public void clearNonSubscriberCache(Long userId) {
-        // --- ЛОГ №3 ---
-        log.info(">>> [CACHE EVICT] Clearing NON-SUBSCRIBER cache for userId: {}", userId);
+    @Caching(evict = {
+            @CacheEvict(value = "outlineCache", key = "#userId + '-true'"),
+            @CacheEvict(value = "outlineCache", key = "#userId + '-false'")
+    })
+    public void clearOutlineCacheForUser(Long userId) {
+        log.info("--- Clearing ALL outline caches for userId: {} ---", userId);
     }
 
     public LectureContentDto getLectureContent(Long lectureId) {

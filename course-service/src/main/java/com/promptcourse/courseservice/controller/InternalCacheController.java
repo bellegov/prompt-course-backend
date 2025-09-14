@@ -16,15 +16,8 @@ public class InternalCacheController {
     private final CourseViewService courseViewService;
 
     @PostMapping("/clear-outline")
-    public ResponseEntity<Void> clearOutlineCache(
-            @RequestParam Long userId,
-            @RequestParam Boolean isSubscribed
-    ) {
-        if (isSubscribed) {
-            courseViewService.clearSubscriberCache(userId);
-        } else {
-            courseViewService.clearNonSubscriberCache(userId);
-        }
+    public ResponseEntity<Void> clearOutlineCache(@RequestParam Long userId) {
+        courseViewService.clearOutlineCacheForUser(userId);
         return ResponseEntity.ok().build();
     }
 }
