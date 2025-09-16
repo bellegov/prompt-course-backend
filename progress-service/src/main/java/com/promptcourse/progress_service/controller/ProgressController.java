@@ -1,0 +1,42 @@
+package com.promptcourse.progress_service.controller;
+import com.promptcourse.progress_service.dto.MarkCompletedRequest;
+import com.promptcourse.progress_service.dto.ProgressRequest;
+import com.promptcourse.progress_service.dto.UserProgressResponse;
+import com.promptcourse.progress_service.service.ProgressService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import java.util.Set;
+
+@RestController
+@RequestMapping("/")
+@RequiredArgsConstructor
+public class ProgressController {
+
+    private final ProgressService progressService;
+
+    // Внутренний, без изменений
+    @PostMapping("/internal/get-progress")
+    public ResponseEntity<UserProgressResponse> getProgressForUser(@RequestBody ProgressRequest request) {
+        return ResponseEntity.ok(progressService.getUserProgress(request.getUserId(), request.getSectionId(), request.isSubscribed()));
+    }
+
+    // Публичный
+    @PostMapping("/complete-lecture")
+    public ResponseEntity<Void> markLectureCompleted(
+            @RequestBody MarkCompletedRequest request,
+            @RequestHeader("X-User-ID") Long userId,
+            @RequestHeader("X-User-Subscribed") boolean isSubscribed // <-- Он должен получать это
+    ) {
+        // И передавать дальше
+        progressService.markLectureAsCompleted(userId, request, isSubscribed);
+        return ResponseEntity.ok().build();
+    }
+
+
+    // Внутренний
+    @GetMapping("/internal/users/{userId}/completed-lectures")
+    public ResponseEntity<Set<Long>> getCompletedLectures(@PathVariable Long userId) {
+        return ResponseEntity.ok(progressService.getCompletedLectureIds(userId));
+    }
+}
