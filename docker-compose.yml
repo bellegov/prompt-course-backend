@@ -72,6 +72,11 @@ services:
       APP_JWT_SECRET: ${APP_JWT_SECRET}
       APP_JWT_EXPIRATION_MS: ${APP_JWT_EXPIRATION_MS}
       APP_FRONTEND_URL: ${APP_FRONTEND_URL}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USERNAME: ${MAIL_USERNAME}
+      MAIL_PASSWORD: ${MAIL_PASSWORD}
+      MAIL_FROM: ${MAIL_FROM}
 
   course-service:
     build: ./course-service

@@ -25,7 +25,7 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private static final Logger log = LoggerFactory.getLogger(PasswordResetService.class);
 
-    @Value("${spring.mail.username}")
+    @Value("${app.mail.from}")
     private String mailFrom;
 
     // URL вашего фронтенда, куда будет вести ссылка из письма

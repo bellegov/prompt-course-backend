@@ -18,7 +18,7 @@ public class EmailService {
     private final JavaMailSender mailSender;
     private static final Logger log = LoggerFactory.getLogger(EmailService.class);
 
-    @Value("${spring.mail.username}")
+    @Value("${app.mail.from}")
     private String mailFrom;
 
     @Async // <-- Аннотация здесь, в отдельном сервисе

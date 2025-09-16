@@ -1,10 +1,10 @@
-package com.promptcourse.user_service;
+package com.promptcourse.progressservice;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class UserServiceApplicationTests {
+class ProgressServiceApplicationTests {
 
 	@Test
 	void contextLoads() {
