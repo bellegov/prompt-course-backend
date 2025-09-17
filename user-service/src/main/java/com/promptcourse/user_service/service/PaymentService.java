@@ -1,138 +1,137 @@
 package com.promptcourse.user_service.service;
 import com.promptcourse.user_service.client.CourseServiceClient;
+import com.promptcourse.user_service.dto.BePaidNotification;
 import com.promptcourse.user_service.dto.CreatePaymentResponse;
-import com.promptcourse.user_service.dto.YooMoneyNotification;
 import com.promptcourse.user_service.model.Subscription;
 import com.promptcourse.user_service.model.SubscriptionStatus;
 import com.promptcourse.user_service.model.User;
 import com.promptcourse.user_service.repository.SubscriptionRepository;
 import com.promptcourse.user_service.repository.UserRepository;
 import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
-import org.springframework.mail.MailException;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.support.BasicAuthenticationInterceptor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
-import java.time.LocalDateTime;
+
 import java.nio.charset.StandardCharsets;
-import org.springframework.http.client.support.BasicAuthenticationInterceptor;
+import java.time.LocalDateTime;
 import java.util.Map;
-import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor // Используем Lombok для конструктора
 public class PaymentService {
 
+    // --- ЗАВИСИМОСТИ ---
     private final UserRepository userRepository;
     private final SubscriptionRepository subscriptionRepository;
-   // private final JavaMailSender mailSender;
-    private final RestTemplate restTemplate;
     private final EmailService emailService;
     private final CourseServiceClient courseServiceClient;
+    private final RestTemplate restTemplate; // Spring создаст этот бин сам
     private static final Logger log = LoggerFactory.getLogger(PaymentService.class);
 
-    @Value("${yoomoney.shop-id}")
+    // --- НАСТРОЙКИ ИЗ application.properties ---
+    @Value("${bepaid.shop-id}")
     private String shopId;
-    @Value("${yoomoney.secret-key}")
+    @Value("${bepaid.secret-key}")
     private String secretKey;
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
+    @Value("${app.webhook.url}") // Новый URL для вебхука
+    private String webhookUrl;
 
-    public PaymentService(UserRepository userRepository, SubscriptionRepository subscriptionRepository, EmailService emailService,CourseServiceClient courseServiceClient) {
-        this.userRepository = userRepository;
-        this.subscriptionRepository = subscriptionRepository;
-        //this.mailSender = mailSender;
-        this.emailService = emailService;
-        this.restTemplate = new RestTemplate();
-        this.courseServiceClient = courseServiceClient;
 
-    }
-    // Метод, который будет вызван после того, как поля shopId и secretKey будут установлены
-    @PostConstruct
-    private void configureRestTemplate() {
-        this.restTemplate.getInterceptors().add(
-                new BasicAuthenticationInterceptor(shopId, secretKey, StandardCharsets.UTF_8)
-        );
-    }
+    /**
+     * Создает платеж через API bePaid и возвращает ссылку для оплаты.
+     */
     public CreatePaymentResponse createPayment(Long userId) {
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found for payment creation: " + userId));
 
-        // TODO: Проверить, нет ли у пользователя уже активной подписки
+        // Убедимся, что у пользователя есть email, перед созданием платежа
+        if (user.getEmail() == null || user.getEmail().isBlank()) {
+            throw new IllegalStateException("Cannot create payment for user without an email.");
+        }
 
-        String url = "https://api.yookassa.ru/v3/payments";
+        String url = "https://checkout.bepaid.by/ctp/api/checkouts";
 
         HttpHeaders headers = new HttpHeaders();
-        headers.set("Idempotence-Key", UUID.randomUUID().toString());
+        // Устанавливаем Basic Auth с помощью ключей. RestTemplate сам их закодирует.
+        headers.setBasicAuth(shopId, secretKey, StandardCharsets.UTF_8);
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // Формируем тело запроса для YooMoney
         Map<String, Object> body = Map.of(
-                // --- ИЗМЕНЕНИЕ 1: ЦЕНА И ВАЛЮТА ---
-                // YooKassa работает с рублями. Вам нужно будет указать эквивалент $5 в рублях.
-                // Например, 450.00 рублей.
-                "amount", Map.of("value", "450.00", "currency", "RUB"),
-                "capture", true,
-                // --- ИЗМЕНЕНИЕ 2: КУДА ВЕРНУТЬ ПОЛЬЗОВАТЕЛЯ ---
-                // Здесь должна быть ссылка на страницу вашего приложения (сайта),
-                // которая покажет "Оплата прошла успешно!".
-                "confirmation", Map.of("type", "redirect", "return_url", "https://your-app.com/payment-success"),
-                "description", "Подписка на Prompt Engineering Courses на 1 месяц",
-                "metadata", Map.of("userId", userId.toString())
+                "checkout", Map.of(
+                        "version", 2.1,
+                        "test", true, // Для разработки. В продакшене поменять на false.
+                        "transaction_type", "payment",
+                        "order", Map.of(
+                                "currency", "USD",
+                                "amount", 500, // $5.00 = 500 центов
+                                "description", "Подписка PRO на 1 месяц"
+                        ),
+                        "settings", Map.of(
+                                "success_url", frontendUrl + "/payment-success",
+                                "decline_url", frontendUrl + "/payment-failed",
+                                "fail_url", frontendUrl + "/payment-failed",
+                                "notification_url", webhookUrl, // Наш URL для веб-хука
+                                "customer_id", userId.toString()
+                        )
+                )
         );
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
-
         ResponseEntity<Map> response = restTemplate.postForEntity(url, request, Map.class);
 
-        Map<String, Object> responseBody = response.getBody();
-        String paymentId = (String) responseBody.get("id");
-        Map<String, String> confirmation = (Map<String, String>) responseBody.get("confirmation");
-        String confirmationUrl = confirmation.get("confirmation_url");
+        Map<String, Object> checkout = (Map<String, Object>) response.getBody().get("checkout");
+        String checkoutUrl = (String) checkout.get("redirect_url");
 
         return CreatePaymentResponse.builder()
-                .paymentId(paymentId)
-                .confirmationUrl(confirmationUrl)
+                .confirmationUrl(checkoutUrl)
                 .build();
     }
 
+    /**
+     * Обрабатывает уведомление (веб-хук) от bePaid.
+     */
     @Transactional
-    public void processNotification(YooMoneyNotification notification) {
-        if (!"notification".equals(notification.getType()) || !"payment.succeeded".equals(notification.getEvent())) {
-            // Игнорируем все уведомления, кроме успешной оплаты
+    public void processNotification(BePaidNotification notification) {
+        BePaidNotification.Transaction tx = notification.getTransaction();
+        if (!"successful".equals(tx.getStatus())) {
+            log.info("Ignored bePaid notification with status: {}", tx.getStatus());
             return;
         }
 
-        YooMoneyNotification.PaymentObject payment = notification.getObject();
-        Long userId = Long.parseLong(payment.getMetadata().get("userId"));
-        User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found from notification"));
+        Long userId = Long.parseLong(tx.getCustomerId());
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found from notification: " + userId));
 
-        // Находим или создаем подписку
         Subscription subscription = subscriptionRepository.findByUserId(userId)
                 .orElse(Subscription.builder().user(user).build());
 
         subscription.setStartDate(LocalDateTime.now());
-        subscription.setEndDate(LocalDateTime.now().plusMonths(1)); // Подписка на месяц
+        subscription.setEndDate(LocalDateTime.now().plusMonths(1));
         subscription.setStatus(SubscriptionStatus.ACTIVE);
-
         subscriptionRepository.save(subscription);
 
+        log.info("Subscription activated for userId: {}", userId);
+
+        // Сбрасываем кэш для пользователя
         try {
-            log.info("Subscription activated for userId: {}. Requesting cache invalidation.", userId);
             courseServiceClient.clearOutlineCache(userId);
+            log.info("Cache invalidation requested for userId {} after subscription activation.", userId);
         } catch (Exception e) {
-            // Если course-service недоступен, это не должно ломать активацию подписки.
-            // Просто логируем ошибку.
             log.error("Failed to request cache invalidation for userId {} after subscription activation.", userId, e);
         }
 
-        // --- ИСПРАВЛЕНИЕ: Оборачиваем отправку письма в try-catch ---
-        try {
-            emailService.sendReceipt(user, payment);
-        } catch (MailException e) {
-            // Если отправка письма не удалась, мы не "роняем" всю транзакцию.
-            // Мы просто логируем ошибку. Подписка при этом останется сохраненной.
-            log.error("Failed to send receipt email for user {} after successful payment.", user.getEmail(), e);
-        }
+        // Асинхронно отправляем квитанцию
+        emailService.sendReceipt(user, tx);
     }
-
 }

@@ -27,7 +27,7 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/auth/**", "/payment/yoomoney/webhook").permitAll()
+                        .requestMatchers("/auth/**", "/payment/bepaid/webhook").permitAll()
                         // Все остальное просто требует аутентификации (а роли проверит @PreAuthorize)
                         .anyRequest().authenticated()
                 )

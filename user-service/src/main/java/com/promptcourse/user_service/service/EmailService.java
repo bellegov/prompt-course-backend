@@ -1,5 +1,5 @@
 package com.promptcourse.user_service.service;
-import com.promptcourse.user_service.dto.YooMoneyNotification;
+import com.promptcourse.user_service.dto.BePaidNotification;
 import com.promptcourse.user_service.model.User;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -22,27 +22,32 @@ public class EmailService {
     private String mailFrom;
 
     @Async // <-- Аннотация здесь, в отдельном сервисе
-    public void sendReceipt(User user, YooMoneyNotification.PaymentObject payment) {
+    public void sendReceipt(User user, BePaidNotification.Transaction payment) {
         if (user.getEmail() == null) {
             log.warn("Cannot send receipt to userId: {}. Email is missing.", user.getId());
             return;
         }
         try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(mailFrom);
-            message.setTo(user.getEmail());
-            message.setSubject("Квитанция об оплате подписки");
-            message.setText(String.format(
-                    "Здравствуйте, %s!\n\nВы успешно оплатили подписку на 1 месяц.\nСумма: %s %s\nID транзакции: %s\n\nСпасибо, что выбрали нас!",
-                    user.getNickname(),
-                    payment.getAmount().getValue(),
-                    payment.getAmount().getCurrency(),
-                    payment.getId()
-            ));
+            SimpleMailMessage message = getSimpleMailMessage(user, payment);
             mailSender.send(message);
             log.info("Receipt email sent successfully to {}", user.getEmail());
         } catch (MailException e) {
             log.error("Failed to send receipt email for user {}", user.getEmail(), e);
         }
+    }
+
+    private SimpleMailMessage getSimpleMailMessage(User user, BePaidNotification.Transaction payment) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom(mailFrom);
+        message.setTo(user.getEmail());
+        message.setSubject("Квитанция об оплате подписки");
+        message.setText(String.format(
+                "Здравствуйте, %s!\n\nВы успешно оплатили подписку на 1 месяц.\nСумма: %.2f %s\nID транзакции: %s\n\nСпасибо!",
+                user.getNickname(),
+                payment.getAmount().getTotal() / 100.0, // Делим копейки на 100
+                payment.getAmount().getCurrency(),
+                payment.getUid()
+        ));
+        return message;
     }
 }

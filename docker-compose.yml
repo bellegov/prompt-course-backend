@@ -77,6 +77,8 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME}
       MAIL_PASSWORD: ${MAIL_PASSWORD}
       MAIL_FROM: ${MAIL_FROM}
+      BEPAID_SHOP_ID: ${BEPAID_SHOP_ID}
+      BEPAID_SECRET_KEY: ${BEPAID_SECRET_KEY}
 
   course-service:
     build: ./course-service
