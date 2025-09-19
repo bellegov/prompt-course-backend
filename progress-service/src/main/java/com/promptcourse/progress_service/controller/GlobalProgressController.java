@@ -13,17 +13,20 @@ public class GlobalProgressController {
 
     private final GlobalProgressService globalProgressService;
 
-    // Публичный эндпоинт для завершения раздела
     @PostMapping("/complete-section")
     public ResponseEntity<Void> completeSection(
-            @RequestBody Map<String, Integer> payload,
-            @RequestHeader("X-User-ID") Long userId // <-- Читаем ID из заголовка
+            @RequestBody Map<String, Object> payload, // <-- меняем тип, чтобы принять и строку, и число
+            @RequestHeader("X-User-ID") Long userId
     ) {
-        Integer sectionOrderIndex = payload.get("sectionOrderIndex");
-        if (sectionOrderIndex == null) {
+        Integer sectionOrderIndex = (Integer) payload.get("sectionOrderIndex");
+        Integer sectionIdInt = (Integer) payload.get("sectionId"); // JSON передаст как Integer
+
+        if (sectionOrderIndex == null || sectionIdInt == null) {
             return ResponseEntity.badRequest().build();
         }
-        globalProgressService.completeSection(userId, sectionOrderIndex);
+        Long sectionId = Long.valueOf(sectionIdInt);
+
+        globalProgressService.completeSection(userId, sectionOrderIndex, sectionId);
         return ResponseEntity.ok().build();
     }
 

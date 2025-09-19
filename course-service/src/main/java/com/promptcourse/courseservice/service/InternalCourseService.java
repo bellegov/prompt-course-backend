@@ -25,9 +25,11 @@ public class InternalCourseService {
     public SectionForProgressDto getSectionStructure(Long sectionId) {
         Section section = sectionRepository.findById(sectionId)
                 .orElseThrow(() -> new RuntimeException("Section not found: " + sectionId));
+        Long testId = testRepository.findBySectionId(sectionId).map(Test::getId).orElse(null);
 
         return SectionForProgressDto.builder()
                 .sectionId(section.getId())
+                .testId(testId)
                 .chapters(section.getChapters().stream()
                         .sorted(Comparator.comparingInt(Chapter::getOrderIndex)) // Сортируем главы
                         .map(this::mapChapter)
@@ -36,8 +38,10 @@ public class InternalCourseService {
     }
 
     private SectionForProgressDto.ChapterForProgressDto mapChapter(Chapter chapter) {
+        Long testId = testRepository.findByChapterId(chapter.getId()).map(Test::getId).orElse(null);
         return SectionForProgressDto.ChapterForProgressDto.builder()
                 .chapterId(chapter.getId())
+                .testId(testId)
                 .lectures(chapter.getLectures().stream()
                         .sorted(Comparator.comparingInt(Lecture::getOrderIndex)) // Сортируем лекции
                         .map(this::mapLecture)

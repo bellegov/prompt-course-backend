@@ -13,6 +13,7 @@ import java.util.List;
 @AllArgsConstructor
 public class SectionForProgressDto {
     private Long sectionId;
+    private Long testId;
     private List<ChapterForProgressDto> chapters;
 
     @Data
@@ -21,6 +22,7 @@ public class SectionForProgressDto {
     @AllArgsConstructor
     public static class ChapterForProgressDto {
         private Long chapterId;
+        private Long testId;
         private List<LectureForProgressDto> lectures;
     }
 

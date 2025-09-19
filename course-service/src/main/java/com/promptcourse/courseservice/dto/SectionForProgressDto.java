@@ -8,12 +8,14 @@ import java.util.List;
 @Builder
 public class SectionForProgressDto {
     private Long sectionId;
+    private Long testId;
     private List<ChapterForProgressDto> chapters;
 
     @Data
     @Builder
     public static class ChapterForProgressDto {
         private Long chapterId;
+        private Long testId;
         private List<LectureForProgressDto> lectures;
     }
 

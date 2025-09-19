@@ -86,37 +86,43 @@ public class ProgressService {
     }
 
     public UserProgressResponse getUserProgress(Long userId, Long sectionId, boolean isSubscribed) {
-        // --- БЛОК 1: ПОЛУЧАЕМ ИНФОРМАЦИЮ О ЖИЗНЯХ ---
+        // --- БЛОК 1: ПОЛУЧАЕМ ИНФОРМАЦИЮ О ЖИЗНЯХ (без изменений) ---
         UserLifeStatus lifeStatus = getOrCreateLifeStatus(userId);
-
         if (!isSubscribed && lifeStatus.getRecoveryStartedAt() != null &&
                 lifeStatus.getRecoveryStartedAt().plusHours(COOLDOWN_HOURS).isBefore(LocalDateTime.now())) {
             lifeStatus.setLives(MAX_LIVES);
             lifeStatus.setRecoveryStartedAt(null);
             lifeStatus = lifeStatusRepository.save(lifeStatus);
         }
-
         int currentLives = isSubscribed ? -1 : lifeStatus.getLives();
         String recoveryTimeLeft = calculateRecoveryTime(lifeStatus);
 
         // --- БЛОК 2: РАССЧИТЫВАЕМ ПРОГРЕСС ---
-
-        // --- ЭТОТ КОД БЫЛ ПРОПУЩЕН ---
         SectionForProgressDto sectionStructure = courseServiceClient.getSectionStructure(sectionId);
         Set<Long> completedLectureIds = progressRepository.findByUserIdAndSectionId(userId, sectionId)
                 .stream().map(UserProgress::getLectureId).collect(Collectors.toSet());
-        // -----------------------------
 
         Map<Long, LectureState> lectureStates = new HashMap<>();
         Map<Long, Boolean> chapterStates = new HashMap<>();
-        boolean previousChapterCompleted = true;
+        boolean previousChapterFullyCompleted = true; // Флаг для разблокировки следующей главы
 
         for (SectionForProgressDto.ChapterForProgressDto chapterDto : sectionStructure.getChapters()) {
-            boolean isChapterUnlocked = previousChapterCompleted;
+
+            // --- НОВАЯ, ПРАВИЛЬНАЯ ЛОГИКА РАЗБЛОКИРОВКИ ГЛАВ ---
+            boolean isChapterUnlocked = previousChapterFullyCompleted;
             chapterStates.put(chapterDto.getChapterId(), isChapterUnlocked);
 
-            boolean allLecturesInChapterCompleted = true;
+            // Определяем, пройдена ли ТЕКУЩАЯ глава, чтобы решить, разблокировать ли СЛЕДУЮЩУЮ
+            boolean allLecturesInChapterDone = chapterDto.getLectures().stream()
+                    .allMatch(l -> completedLectureIds.contains(l.getLectureId()));
+            boolean chapterTestDone = (chapterDto.getTestId() == null) || completedTestRepository.existsByUserIdAndTestId(userId, chapterDto.getTestId());
 
+            if (!allLecturesInChapterDone || !chapterTestDone) {
+                previousChapterFullyCompleted = false; // Если эта глава не завершена, следующая будет заблокирована
+            }
+            // --------------------------------------------------
+
+            // Логика разблокировки лекций внутри главы
             List<Long> orderedLectureIds = chapterDto.getLectures().stream()
                     .map(SectionForProgressDto.LectureForProgressDto::getLectureId)
                     .collect(Collectors.toList());
@@ -136,17 +142,6 @@ public class ProgressService {
                         break;
                     }
                 }
-            }
-
-            for(Long lectureId : orderedLectureIds) {
-                if (lectureStates.get(lectureId) != LectureState.COMPLETED) {
-                    allLecturesInChapterCompleted = false;
-                    break;
-                }
-            }
-
-            if (!allLecturesInChapterCompleted) {
-                previousChapterCompleted = false;
             }
         }
 
