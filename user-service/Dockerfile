@@ -7,5 +7,5 @@ RUN ./gradlew build -x test
 # Этап 2: Создание легковесного финального образа
 FROM eclipse-temurin:17-jre-focal
 WORKDIR /app
-COPY --from=build /app/build/libs/*.jar app.jar
+COPY --from=build /app/build/libs/*-SNAPSHOT.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]
