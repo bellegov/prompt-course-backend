@@ -1,47 +1,49 @@
 package com.promptcourse.api_gateway.config;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.reactive.CorsWebFilter;
-import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.web.cors.reactive.CorsUtils;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
+import reactor.core.publisher.Mono;
 
-import java.util.Arrays;
 import java.util.List;
 
 @Configuration
 public class CorsConfig {
 
+    private static final String ALLOWED_HEADERS = "x-requested-with, authorization, Content-Type, Content-Length, Authorization, credential, X-XSRF-TOKEN";
+    private static final String ALLOWED_METHODS = "GET, PUT, POST, DELETE, OPTIONS";
+    private static final String MAX_AGE = "3600";
+
     @Bean
-    public CorsWebFilter corsWebFilter() {
-        CorsConfiguration corsConfig = new CorsConfiguration();
+    public WebFilter corsFilter() {
+        return (ServerWebExchange ctx, WebFilterChain chain) -> {
+            ServerHttpRequest request = ctx.getRequest();
 
-        // --- РАЗРЕШЕННЫЕ ИСТОЧНИКИ (ВАЖНО!) ---
-        // Добавляем URL фронтенда для локальной разработки и для продакшена
-        corsConfig.setAllowedOrigins(List.of(
-                "http://localhost:5173",
-                "https://promptly.by"
-        ));
+            // Список разрешенных доменов
+            List<String> allowedOrigins = List.of("http://localhost:5173", "https://promtly.by");
+            String origin = request.getHeaders().getOrigin();
 
-        // --- РАЗРЕШЕННЫЕ МЕТОДЫ ---
-        corsConfig.setAllowedMethods(Arrays.asList(
-                HttpMethod.GET.name(),
-                HttpMethod.POST.name(),
-                HttpMethod.PUT.name(),
-                HttpMethod.DELETE.name(),
-                HttpMethod.OPTIONS.name() // OPTIONS критически важен для preflight-запросов
-        ));
-
-        // --- РАЗРЕШЕННЫЕ ЗАГОЛОВКИ ---
-        corsConfig.addAllowedHeader("*");
-
-        // --- РАЗРЕШЕНИЕ ПЕРЕДАЧИ "ЧУВСТВИТЕЛЬНЫХ" ДАННЫХ ---
-        corsConfig.setAllowCredentials(true);
-
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // Применяем эту конфигурацию ко всем путям
-        source.registerCorsConfiguration("/**", corsConfig);
-
-        return new CorsWebFilter(source);
+            if (CorsUtils.isCorsRequest(request) && allowedOrigins.contains(origin)) {
+                ServerHttpResponse response = ctx.getResponse();
+                HttpHeaders headers = response.getHeaders();
+                headers.add("Access-Control-Allow-Origin", origin);
+                headers.add("Access-Control-Allow-Methods", ALLOWED_METHODS);
+                headers.add("Access-Control-Max-Age", MAX_AGE);
+                headers.add("Access-Control-Allow-Headers", ALLOWED_HEADERS);
+                if (request.getMethod() == HttpMethod.OPTIONS) {
+                    response.setStatusCode(HttpStatus.OK);
+                    return Mono.empty();
+                }
+            }
+            return chain.filter(ctx);
+        };
     }
 }
