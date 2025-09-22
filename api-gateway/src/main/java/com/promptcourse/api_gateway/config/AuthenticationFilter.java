@@ -6,7 +6,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.core.Ordered;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -30,13 +29,7 @@ public class AuthenticationFilter implements GatewayFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
 
-        log.info("Processing request: {} {}", request.getMethod(), request.getURI().getPath());
-
-        // ВАЖНО: Пропускаем все OPTIONS запросы без проверки авторизации
-        if (request.getMethod() == HttpMethod.OPTIONS) {
-            log.info("OPTIONS request detected, passing through without authentication");
-            return chain.filter(exchange);
-        }
+        log.info("AuthenticationFilter: Processing request: {} {}", request.getMethod(), request.getURI().getPath());
 
         // Проверяем наличие заголовка Authorization
         if (!request.getHeaders().containsKey("Authorization")) {
@@ -94,6 +87,7 @@ public class AuthenticationFilter implements GatewayFilter, Ordered {
         log.error("Returning error response: {}", status);
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(status);
+        // CORS заголовки уже добавлены в CorsGlobalFilter
         return response.setComplete();
     }
 
@@ -107,6 +101,6 @@ public class AuthenticationFilter implements GatewayFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return 1; // Выполняется после CORS фильтра (который имеет порядок 0)
+        return 1; // Выполняется после CorsGlobalFilter (порядок = -1)
     }
 }
