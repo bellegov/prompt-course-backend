@@ -17,7 +17,6 @@ import java.util.List;
 
 @Configuration
 public class CorsConfig {
-
     private static final String ALLOWED_HEADERS = "x-requested-with, authorization, Content-Type, Content-Length, Authorization, credential, X-XSRF-TOKEN";
     private static final String ALLOWED_METHODS = "GET, PUT, POST, DELETE, OPTIONS";
     private static final String MAX_AGE = "3600";
@@ -27,8 +26,7 @@ public class CorsConfig {
         return (ServerWebExchange ctx, WebFilterChain chain) -> {
             ServerHttpRequest request = ctx.getRequest();
 
-            // Список разрешенных доменов
-            List<String> allowedOrigins = List.of("http://localhost:5173", "https://promtly.by");
+            List<String> allowedOrigins = List.of("http://localhost:5173", "https://promptly.by");
             String origin = request.getHeaders().getOrigin();
 
             if (CorsUtils.isCorsRequest(request) && allowedOrigins.contains(origin)) {
@@ -38,6 +36,9 @@ public class CorsConfig {
                 headers.add("Access-Control-Allow-Methods", ALLOWED_METHODS);
                 headers.add("Access-Control-Max-Age", MAX_AGE);
                 headers.add("Access-Control-Allow-Headers", ALLOWED_HEADERS);
+                // --- ВОТ НЕДОСТАЮЩАЯ СТРОКА ---
+                headers.add("Access-Control-Allow-Credentials", "true");
+
                 if (request.getMethod() == HttpMethod.OPTIONS) {
                     response.setStatusCode(HttpStatus.OK);
                     return Mono.empty();
