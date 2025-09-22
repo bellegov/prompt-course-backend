@@ -6,6 +6,7 @@ import org.springframework.cloud.gateway.route.RouteLocator;
 import org.springframework.cloud.gateway.route.builder.RouteLocatorBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 
 @Configuration
 @RequiredArgsConstructor
@@ -19,6 +20,30 @@ public class GatewayConfig {
         log.info("=== Creating routes ===");
 
         RouteLocator routeLocator = builder.routes()
+
+                // ---------- OPTIONS ROUTES (для CORS preflight) ----------
+                // Эти маршруты должны быть ПЕРВЫМИ и БЕЗ фильтров авторизации!
+                .route("options-courses", r -> {
+                    log.info("Setting up OPTIONS route for courses");
+                    return r.method(HttpMethod.OPTIONS)
+                            .and().path("/courses/**", "/api/courses/**")
+                            .filters(f -> f.stripPrefix(0)) // не убираем префикс для OPTIONS
+                            .uri("lb://COURSE-SERVICE");
+                })
+                .route("options-users", r -> {
+                    log.info("Setting up OPTIONS route for users");
+                    return r.method(HttpMethod.OPTIONS)
+                            .and().path("/users/**", "/api/users/**")
+                            .filters(f -> f.stripPrefix(0))
+                            .uri("lb://USER-SERVICE");
+                })
+                .route("options-progress", r -> {
+                    log.info("Setting up OPTIONS route for progress");
+                    return r.method(HttpMethod.OPTIONS)
+                            .and().path("/progress/**", "/api/progress/**")
+                            .filters(f -> f.stripPrefix(0))
+                            .uri("lb://PROGRESS-SERVICE");
+                })
 
                 // ---------- USER-SERVICE ----------
                 // Публичные ручки авторизации (/api/users/auth/**)
@@ -41,6 +66,7 @@ public class GatewayConfig {
                     log.info("Setting up user-service-secured route");
                     return r.path("/api/users/**")
                             .and().not(nr -> nr.path("/api/users/auth/**"))
+                            .and().not(nr -> nr.method(HttpMethod.OPTIONS)) // исключаем OPTIONS
                             .filters(f -> f.filter(filter).stripPrefix(2))
                             .uri("lb://USER-SERVICE");
                 })
@@ -49,6 +75,7 @@ public class GatewayConfig {
                     log.info("Setting up user-service-secured-alt route");
                     return r.path("/users/**")
                             .and().not(nr -> nr.path("/users/auth/**"))
+                            .and().not(nr -> nr.method(HttpMethod.OPTIONS)) // исключаем OPTIONS
                             .filters(f -> f.filter(filter).stripPrefix(1))
                             .uri("lb://USER-SERVICE");
                 })
@@ -57,12 +84,14 @@ public class GatewayConfig {
                 .route("course-service-secured", r -> {
                     log.info("Setting up course-service-secured route");
                     return r.path("/api/courses/**")
+                            .and().not(nr -> nr.method(HttpMethod.OPTIONS)) // исключаем OPTIONS
                             .filters(f -> f.filter(filter).stripPrefix(2))
                             .uri("lb://COURSE-SERVICE");
                 })
                 .route("course-service-secured-alt", r -> {
                     log.info("Setting up course-service-secured-alt route");
                     return r.path("/courses/**")
+                            .and().not(nr -> nr.method(HttpMethod.OPTIONS)) // исключаем OPTIONS
                             .filters(f -> f.filter(filter).stripPrefix(1))
                             .uri("lb://COURSE-SERVICE");
                 })
@@ -71,17 +100,19 @@ public class GatewayConfig {
                 .route("progress-service-secured", r -> {
                     log.info("Setting up progress-service-secured route");
                     return r.path("/api/progress/**")
+                            .and().not(nr -> nr.method(HttpMethod.OPTIONS)) // исключаем OPTIONS
                             .filters(f -> f.filter(filter).stripPrefix(2))
                             .uri("lb://PROGRESS-SERVICE");
                 })
                 .route("progress-service-secured-alt", r -> {
                     log.info("Setting up progress-service-secured-alt route");
                     return r.path("/progress/**")
+                            .and().not(nr -> nr.method(HttpMethod.OPTIONS)) // исключаем OPTIONS
                             .filters(f -> f.filter(filter).stripPrefix(1))
                             .uri("lb://PROGRESS-SERVICE");
                 })
 
-                // ---------- WEBHOOK ----------
+                // ---------- WEBHOOK (публичный) ----------
                 .route("webhook-service-public", r -> {
                     log.info("Setting up webhook-service-public route");
                     return r.path("/payment/yoomoney/webhook")

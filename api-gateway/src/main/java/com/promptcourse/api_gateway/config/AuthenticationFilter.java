@@ -5,8 +5,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
+import org.springframework.core.Ordered;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
@@ -15,22 +18,29 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
-@Slf4j // Добавляем логирование для отладки
-public class AuthenticationFilter implements GatewayFilter {
+@Slf4j
+public class AuthenticationFilter implements GatewayFilter, Ordered {
 
     private final JwtService jwtService;
+
     private final List<String> adminRoutes = List.of("/api/courses/admin", "/api/users/admin");
-    private final List<String> publicRoutes = List.of("/api/users/auth", "/payment/yoomoney/webhook");
+    private final List<String> publicRoutes = List.of("/api/users/auth", "/payment/bepaid/webhook");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
 
-        // Добавляем логирование для отладки
         log.info("Processing request: {} {}", request.getMethod(), request.getURI().getPath());
 
+        // ВАЖНО: Пропускаем все OPTIONS запросы без проверки авторизации
+        if (request.getMethod() == HttpMethod.OPTIONS) {
+            log.info("OPTIONS request detected, passing through without authentication");
+            return chain.filter(exchange);
+        }
+
+        // Проверяем наличие заголовка Authorization
         if (!request.getHeaders().containsKey("Authorization")) {
-            log.warn("Missing Authorization header");
+            log.warn("Missing Authorization header for path: {}", request.getURI().getPath());
             return onError(exchange, HttpStatus.UNAUTHORIZED);
         }
 
@@ -41,7 +51,6 @@ public class AuthenticationFilter implements GatewayFilter {
         }
 
         String token = authHeader.substring(7);
-
         try {
             if (jwtService.isTokenExpired(token)) {
                 log.warn("Token is expired");
@@ -61,33 +70,31 @@ public class AuthenticationFilter implements GatewayFilter {
                 return onError(exchange, HttpStatus.FORBIDDEN);
             }
 
-            // ИСПРАВЛЕНИЕ: Создаем новый запрос с заголовками и передаем его дальше
+            // Создаем новый запрос с заголовками
             ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
                     .header("X-User-ID", userId)
                     .header("X-User-Roles", role)
                     .header("X-User-Subscribed", isSubscribed)
                     .build();
 
-            // Создаем новый exchange с измененным запросом
             ServerWebExchange mutatedExchange = exchange.mutate()
                     .request(mutatedRequest)
                     .build();
 
             log.info("Headers added successfully, forwarding to service");
-
-            // Передаем НОВЫЙ exchange дальше по цепочке
             return chain.filter(mutatedExchange);
 
         } catch (Exception e) {
-            log.error("JWT validation failed", e);
+            log.error("JWT validation failed: {}", e.getMessage());
             return onError(exchange, HttpStatus.UNAUTHORIZED);
         }
     }
 
     private Mono<Void> onError(ServerWebExchange exchange, HttpStatus status) {
         log.error("Returning error response: {}", status);
-        exchange.getResponse().setStatusCode(status);
-        return exchange.getResponse().setComplete();
+        ServerHttpResponse response = exchange.getResponse();
+        response.setStatusCode(status);
+        return response.setComplete();
     }
 
     private boolean isPublicEndpoint(ServerHttpRequest request) {
@@ -96,5 +103,10 @@ public class AuthenticationFilter implements GatewayFilter {
 
     private boolean isAdminRoute(ServerHttpRequest request) {
         return adminRoutes.stream().anyMatch(route -> request.getURI().getPath().startsWith(route));
+    }
+
+    @Override
+    public int getOrder() {
+        return 1; // Выполняется после CORS фильтра (который имеет порядок 0)
     }
 }
