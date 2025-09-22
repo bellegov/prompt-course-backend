@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.cloud.gateway.filter.GatewayFilter;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.core.Ordered;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -29,7 +30,19 @@ public class AuthenticationFilter implements GatewayFilter, Ordered {
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
 
+        // ПРОПУСКАТЬ PREFLIGHT OPTIONS ЗАПРОСЫ
+        if (request.getMethod() == HttpMethod.OPTIONS) {
+            log.info("Skipping authentication for OPTIONS request: {}", request.getURI().getPath());
+            return chain.filter(exchange);
+        }
+
         log.info("AuthenticationFilter: Processing request: {} {}", request.getMethod(), request.getURI().getPath());
+
+        // Проверяем, является ли маршрут публичным (у тебя есть такой метод, но он не используется)
+        if (isPublicEndpoint(request)) {
+            log.info("Public route, skipping authentication for: {}", request.getURI().getPath());
+            return chain.filter(exchange);
+        }
 
         // Проверяем наличие заголовка Authorization
         if (!request.getHeaders().containsKey("Authorization")) {
@@ -91,7 +104,10 @@ public class AuthenticationFilter implements GatewayFilter, Ordered {
         return response.setComplete();
     }
 
+    // Добавь проверку на публичные маршруты в начало фильтра
     private boolean isPublicEndpoint(ServerHttpRequest request) {
+        // В твоем коде эта логика есть, но не используется. А зря!
+        // Маршруты /api/users/auth/** должны быть публичными.
         return publicRoutes.stream().anyMatch(route -> request.getURI().getPath().startsWith(route));
     }
 
