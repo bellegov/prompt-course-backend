@@ -29,22 +29,24 @@ public class AuthenticationFilter implements GatewayFilter, Ordered {
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         ServerHttpRequest request = exchange.getRequest();
+        log.info("Request received: {} {}", request.getMethod(), request.getURI().getPath());
 
-        // ПРОПУСКАТЬ PREFLIGHT OPTIONS ЗАПРОСЫ
+        // 1. Пропускаем preflight OPTIONS запросы без всяких проверок.
+        // Nginx уже должен был на них ответить, но эта проверка - дополнительная защита.
         if (request.getMethod() == HttpMethod.OPTIONS) {
-            log.info("Skipping authentication for OPTIONS request: {}", request.getURI().getPath());
+            log.info("OPTIONS request detected, passing through. Path: {}", request.getURI().getPath());
             return chain.filter(exchange);
         }
 
-        log.info("AuthenticationFilter: Processing request: {} {}", request.getMethod(), request.getURI().getPath());
-
-        // Проверяем, является ли маршрут публичным (у тебя есть такой метод, но он не используется)
+        // 2. Проверяем, является ли маршрут публичным. Если да - пропускаем дальше без проверки токена.
         if (isPublicEndpoint(request)) {
-            log.info("Public route, skipping authentication for: {}", request.getURI().getPath());
+            log.info("Public endpoint detected, skipping token validation. Path: {}", request.getURI().getPath());
             return chain.filter(exchange);
         }
 
-        // Проверяем наличие заголовка Authorization
+        log.info("Protected route detected, proceeding with authentication. Path: {}", request.getURI().getPath());
+
+        // 3. Для всех остальных (защищенных) маршрутов проверяем заголовок Authorization
         if (!request.getHeaders().containsKey("Authorization")) {
             log.warn("Missing Authorization header for path: {}", request.getURI().getPath());
             return onError(exchange, HttpStatus.UNAUTHORIZED);
@@ -52,14 +54,14 @@ public class AuthenticationFilter implements GatewayFilter, Ordered {
 
         String authHeader = request.getHeaders().getOrEmpty("Authorization").get(0);
         if (!authHeader.startsWith("Bearer ")) {
-            log.warn("Invalid Authorization header format");
+            log.warn("Invalid Authorization header format for path: {}", request.getURI().getPath());
             return onError(exchange, HttpStatus.UNAUTHORIZED);
         }
 
         String token = authHeader.substring(7);
         try {
             if (jwtService.isTokenExpired(token)) {
-                log.warn("Token is expired");
+                log.warn("Token is expired for path: {}", request.getURI().getPath());
                 return onError(exchange, HttpStatus.UNAUTHORIZED);
             }
 
@@ -72,7 +74,7 @@ public class AuthenticationFilter implements GatewayFilter, Ordered {
 
             // Проверяем права доступа к админским маршрутам
             if (isAdminRoute(request) && !"ADMIN".equals(role)) {
-                log.warn("Access denied to admin route for user with role: {}", role);
+                log.warn("Access denied to admin route for user with role: {}. Path: {}", role, request.getURI().getPath());
                 return onError(exchange, HttpStatus.FORBIDDEN);
             }
 
@@ -87,15 +89,14 @@ public class AuthenticationFilter implements GatewayFilter, Ordered {
                     .request(mutatedRequest)
                     .build();
 
-            log.info("Headers added successfully, forwarding to service");
+            log.info("Headers added successfully, forwarding to service. Path: {}", request.getURI().getPath());
             return chain.filter(mutatedExchange);
 
         } catch (Exception e) {
-            log.error("JWT validation failed: {}", e.getMessage());
+            log.error("JWT validation failed for path: {}. Error: {}", request.getURI().getPath(), e.getMessage());
             return onError(exchange, HttpStatus.UNAUTHORIZED);
         }
     }
-
     private Mono<Void> onError(ServerWebExchange exchange, HttpStatus status) {
         log.error("Returning error response: {}", status);
         ServerHttpResponse response = exchange.getResponse();
