@@ -115,7 +115,10 @@ services:
     image: redis:7-alpine
     container_name: redis-cache
     ports:
-      - "6379:6379" # Стандартный порт Redis    
+      - "6379:6379" # Стандартный порт Redis  
+    command: redis-server --save 60 1 --loglevel warning # <-- Добавь эту строку
+    volumes:
+      - redis-data:/data # <-- И эту! САМАЯ ВАЖНАЯ СТРОКА!  
       
   # --- ВСПОМОГАТЕЛЬНЫЕ ИНСТРУМЕНТЫ ---
   zipkin:
@@ -134,3 +137,4 @@ volumes:
   pgdata-user:
   pgdata-course:
   pgdata-progress:
+  redis-data:
