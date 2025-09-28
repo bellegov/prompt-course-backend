@@ -21,4 +21,7 @@ public class Section {
 
     @Column(nullable = false, columnDefinition = "INT DEFAULT 1")
     private Integer iconId = 1;
+
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    private boolean isPremium = false;
 }

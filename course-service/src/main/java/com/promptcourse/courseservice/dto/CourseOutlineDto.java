@@ -24,6 +24,7 @@ public class CourseOutlineDto implements Serializable {
         private int progressPercentage;
         private boolean isUnlocked;
         private Integer iconId;
+        private boolean isPremium;
     }
 
     @Data

@@ -35,6 +35,7 @@ public class AdminCourseController {
         section.setTitle(dto.getTitle());
         section.setDescription(dto.getDescription());
         section.setOrderIndex(dto.getOrderIndex());
+        section.setPremium(dto.isPremium());
         if (dto.getIconId() != null) {
             section.setIconId(dto.getIconId());
         }
@@ -63,6 +64,7 @@ public class AdminCourseController {
                     section.setTitle(dto.getTitle());
                     section.setDescription(dto.getDescription());
                     section.setOrderIndex(dto.getOrderIndex());
+                    section.setPremium(dto.isPremium());
                     if (dto.getIconId() != null) {
                         section.setIconId(dto.getIconId());
                     }

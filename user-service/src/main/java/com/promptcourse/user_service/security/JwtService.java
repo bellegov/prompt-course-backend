@@ -1,5 +1,6 @@
 package com.promptcourse.user_service.security;
 
+import com.promptcourse.user_service.model.Role;
 import com.promptcourse.user_service.model.SubscriptionStatus;
 import com.promptcourse.user_service.model.User;
 import com.promptcourse.user_service.repository.SubscriptionRepository;
@@ -47,9 +48,16 @@ public class JwtService {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", user.getId());
         claims.put("role", user.getRole().name()); // Кладем роль как строку "USER" или "ADMIN"
-        boolean isSubscribed = subscriptionRepository.findByUserId(user.getId())
-                .map(sub -> sub.getStatus() == SubscriptionStatus.ACTIVE && sub.getEndDate().isAfter(LocalDateTime.now()))
-                .orElse(false);
+        boolean isSubscribed;
+        // 1. Админ - всегда "подписчик"
+        if (user.getRole() == Role.ADMIN) {
+            isSubscribed = true;
+        } else {
+            // 2. Для остальных - проверяем базу
+            isSubscribed = subscriptionRepository.findByUserId(user.getId())
+                    .map(sub -> sub.getStatus() == SubscriptionStatus.ACTIVE && sub.getEndDate().isAfter(LocalDateTime.now()))
+                    .orElse(false);
+        }
         claims.put("isSubscribed", isSubscribed);
 
         String subject = user.getEmail() != null ? user.getEmail() : user.getId().toString();

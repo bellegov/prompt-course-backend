@@ -51,15 +51,22 @@ public class CourseViewService {
         // 3. Формируем список секций с учетом статуса подписки и прогресса
         List<SectionOutlineDto> sectionDtos = sections.stream()
                 .map(section -> {
-                    // --- ЛОГИКА РАЗБЛОКИРОВКИ РАЗДЕЛОВ ---
+                    // --- ФИНАЛЬНАЯ ЛОГИКА РАЗБЛОКИРОВКИ РАЗДЕЛОВ ---
                     boolean isSectionUnlocked;
                     if (isSubscribed) {
+                        // Для подписчиков и админов все разделы всегда разблокированы
                         isSectionUnlocked = true;
                     } else {
-                        isSectionUnlocked = section.getOrderIndex() <= (lastCompletedIndex + 1);
+                        // Для обычных пользователей:
+                        // 1. Раздел НЕ должен быть премиальным.
+                        if (section.isPremium()) {
+                            isSectionUnlocked = false;
+                        } else {
+                            // 2. И он должен быть следующим по порядку.
+                            isSectionUnlocked = section.getOrderIndex() <= (lastCompletedIndex + 1);
+                        }
                     }
 
-                    // Запрашиваем детальный прогресс только для разблокированных секций
                     UserProgressResponse progress = isSectionUnlocked
                             ? progressServiceClient.getProgressForUser(new ProgressRequest(userId, section.getId(), isSubscribed))
                             : null;
@@ -124,6 +131,7 @@ public class CourseViewService {
                 .testId(testId)
                 .progressPercentage(safeProgress.getProgressPercentage())
                 .isUnlocked(isSectionUnlocked)
+                .isPremium(section.isPremium())
                 .iconId(section.getIconId())
                 .build();
     }
