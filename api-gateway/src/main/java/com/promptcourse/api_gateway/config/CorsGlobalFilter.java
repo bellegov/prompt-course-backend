@@ -26,7 +26,7 @@ public class CorsGlobalFilter implements GlobalFilter, Ordered {
 
         // Добавляем CORS заголовки ко ВСЕМ ответам
         String origin = request.getHeaders().getOrigin();
-        if (origin != null && (origin.equals("https://promtly.by") || origin.startsWith("http://localhost:"))) {
+        if (origin != null && (origin.equals("https://promtly.by") || origin.startsWith("http://localhost:5173"))) {
             headers.add("Access-Control-Allow-Origin", origin);
         } else {
             headers.add("Access-Control-Allow-Origin", "https://promtly.by");
