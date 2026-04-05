@@ -54,6 +54,35 @@ services:
       POSTGRES_PASSWORD: ${PROGRESS_DB_PASSWORD}
     volumes: [pgdata-progress:/var/lib/postgresql/data]
 
+  ai-db:
+    image: postgres:15-alpine
+    container_name: ai-db
+    ports: ["5436:5432"] # Новый внешний порт, чтобы не было конфликтов
+    environment:
+      POSTGRES_DB: ${AI_DB_NAME}
+      POSTGRES_USER: ${AI_DB_USER}
+      POSTGRES_PASSWORD: ${AI_DB_PASSWORD}
+    volumes: [pgdata-ai:/var/lib/postgresql/data]
+
+  ai-service:
+    build: ./ai-service
+    container_name: ai-service
+    ports:
+      - "${AI_SERVICE_PORT}:${SERVER_PORT_AI_SERVICE}"
+    depends_on: [service-registry, ai-db] # <-- ТЕПЕРЬ ОН ЖДЕТ СВОЮ БАЗУ ДАННЫХ
+    environment:
+      SERVER_PORT: ${SERVER_PORT_AI_SERVICE}
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://service-registry:8761/eureka/
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      # --- ДОБАВЛЯЕМ ПОДКЛЮЧЕНИЕ К ЕГО СОБСТВЕННОЙ БД ---
+      SPRING_DATASOURCE_URL: jdbc:postgresql://ai-db:5432/${AI_DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${AI_DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${AI_DB_PASSWORD}
+      # Настройки трассировки
+      MANAGEMENT_TRACING_ENABLED: "true"
+      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin:9411/api/v2/spans"
+      MANAGEMENT_TRACING_SAMPLING_PROBABILITY: "1.0"
+
   # --- МИКРОСЕРВИСЫ ПРИЛОЖЕНИЯ ---
   user-service:
     build: ./user-service
@@ -137,4 +166,6 @@ volumes:
   pgdata-user:
   pgdata-course:
   pgdata-progress:
+  pgdata-ai:
   redis-data:
+  

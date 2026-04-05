@@ -53,6 +53,6 @@ public class CorsGlobalFilter implements GlobalFilter, Ordered {
 
     @Override
     public int getOrder() {
-        return -1; // Самый высокий приоритет - выполняется первым
+        return -1;
     }
 }

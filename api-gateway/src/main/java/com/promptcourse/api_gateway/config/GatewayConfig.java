@@ -87,6 +87,11 @@ public class GatewayConfig {
                     return r.path("/payment/yoomoney/webhook")
                             .uri("lb://USER-SERVICE");
                 })
+                // ---------- AI-SERVICE ----------
+                .route("ai-service", r -> r.path("/api/ai/**")
+                        .filters(f -> f.filter(filter).stripPrefix(2))
+                        .uri("lb://AI-SERVICE"))
+
 
                 .build();
 
