@@ -109,7 +109,7 @@ public class CourseViewService {
         Long testId = testRepository.findByLectureId(lectureId).map(Test::getId).orElse(null);
         return LectureContentDto.builder()
                 .id(lecture.getId()).title(lecture.getTitle()).contentText(lecture.getContentText())
-                .videoUrl(lecture.getVideoUrl()).testId(testId).build();
+                .videoUrl(lecture.getVideoUrl()).testId(testId).coverImageUrl(lecture.getCoverImageUrl()).build();
     }
 
     private SectionOutlineDto mapSectionToDto(Section section, UserProgressResponse progress, boolean isSectionUnlocked) {
@@ -132,6 +132,7 @@ public class CourseViewService {
                 .progressPercentage(safeProgress.getProgressPercentage())
                 .isUnlocked(isSectionUnlocked)
                 .isPremium(section.isPremium())
+                .coverImageUrl(section.getCoverImageUrl())
                 .iconId(section.getIconId())
                 .build();
     }
@@ -157,6 +158,7 @@ public class CourseViewService {
         return ChapterOutlineDto.builder()
                 .id(chapter.getId()).title(chapter.getTitle()).lectures(lectureDtos)
                 .testId(testId)
+                .coverImageUrl(chapter.getCoverImageUrl())
                 .isUnlocked(chapterStates != null && chapterStates.getOrDefault(chapter.getId(), false))
                 .build();
     }
@@ -165,6 +167,7 @@ public class CourseViewService {
         Long testId = testRepository.findByLectureId(lecture.getId()).map(Test::getId).orElse(null);
         return LectureOutlineDto.builder()
                 .id(lecture.getId()).title(lecture.getTitle()).testId(testId)
+                .coverImageUrl(lecture.getCoverImageUrl())
                 .state(lectureStates.getOrDefault(lecture.getId(), LectureState.LOCKED))
                 .promptsAvailable(promptsAvailable).build();
     }

@@ -29,4 +29,6 @@ public class Lecture {
     @OneToMany(mappedBy = "lecture", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference // <-- Главная сторона для связи с промптами
     private List<Prompt> prompts;
+
+    private String coverImageUrl;
 }

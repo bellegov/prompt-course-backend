@@ -9,4 +9,5 @@ public class LectureDTO {
     private String contentText;
     private String videoUrl;
     private int orderIndex;
+    private String coverImageUrl;
 }

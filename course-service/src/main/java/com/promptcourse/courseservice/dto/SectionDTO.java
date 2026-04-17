@@ -11,4 +11,6 @@ public class SectionDTO {
 
     @JsonProperty("isPremium")
     private boolean isPremium;
+
+    private String coverImageUrl;
 }

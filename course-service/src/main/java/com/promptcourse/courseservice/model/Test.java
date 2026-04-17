@@ -38,4 +38,6 @@ public class Test {
 
     @Column(nullable = false, columnDefinition = "INT DEFAULT 1")
     private int passingScore;
+
+    private String coverImageUrl;
 }

@@ -20,4 +20,6 @@ public class CreateTestRequest {
         private String answerText;
         private Boolean isCorrect;
     }
+
+    private String coverImageUrl;
 }

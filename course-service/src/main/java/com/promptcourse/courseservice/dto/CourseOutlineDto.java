@@ -25,6 +25,7 @@ public class CourseOutlineDto implements Serializable {
         private boolean isUnlocked;
         private Integer iconId;
         private boolean isPremium;
+        private String coverImageUrl;
     }
 
     @Data
@@ -35,6 +36,7 @@ public class CourseOutlineDto implements Serializable {
         private Long testId;
         private List<LectureOutlineDto> lectures;
         private boolean isUnlocked; // <-- НОВОЕ ПОЛЕ: для отрисовки главой
+        private String coverImageUrl;
     }
 
     @Data
@@ -45,5 +47,6 @@ public class CourseOutlineDto implements Serializable {
         private Long testId;
         private LectureState state; // <-- НОВОЕ ПОЛЕ: LOCKED, UNLOCKED или COMPLETED
         private boolean promptsAvailable; // <-- НОВОЕ ПОЛЕ: для кнопки "Запросы"
+        private String coverImageUrl;
     }
 }

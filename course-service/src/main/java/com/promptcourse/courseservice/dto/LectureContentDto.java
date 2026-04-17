@@ -11,4 +11,5 @@ public class LectureContentDto {
     private String contentText;
     private String videoUrl;
     private Long testId; // ID теста, если он есть, иначе null
+    private String coverImageUrl;
 }

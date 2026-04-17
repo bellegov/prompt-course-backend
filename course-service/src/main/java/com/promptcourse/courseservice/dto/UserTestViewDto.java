@@ -10,6 +10,7 @@ public class UserTestViewDto {
     private Long testId;
     private String title;
     private List<QuestionViewDto> questions;
+    private String coverImageUrl;
 
     @Data
     @Builder

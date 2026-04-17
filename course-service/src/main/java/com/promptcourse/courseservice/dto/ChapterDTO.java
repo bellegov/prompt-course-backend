@@ -6,4 +6,5 @@ import lombok.Data;
 public class ChapterDTO {
     private String title;
     private int orderIndex;
+    private String coverImageUrl;
 }

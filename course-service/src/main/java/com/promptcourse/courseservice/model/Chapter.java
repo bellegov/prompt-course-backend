@@ -24,4 +24,6 @@ public class Chapter {
     @OneToMany(mappedBy = "chapter", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonManagedReference
     private List<Lecture> lectures;
+
+    private String coverImageUrl;
 }

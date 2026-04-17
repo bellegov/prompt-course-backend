@@ -36,6 +36,7 @@ public class AdminCourseController {
         section.setDescription(dto.getDescription());
         section.setOrderIndex(dto.getOrderIndex());
         section.setPremium(dto.isPremium());
+        section.setCoverImageUrl(dto.getCoverImageUrl());
         if (dto.getIconId() != null) {
             section.setIconId(dto.getIconId());
         }
@@ -65,6 +66,7 @@ public class AdminCourseController {
                     section.setDescription(dto.getDescription());
                     section.setOrderIndex(dto.getOrderIndex());
                     section.setPremium(dto.isPremium());
+                    section.setCoverImageUrl(dto.getCoverImageUrl());
                     if (dto.getIconId() != null) {
                         section.setIconId(dto.getIconId());
                     }
@@ -94,6 +96,7 @@ public class AdminCourseController {
                     Chapter chapter = new Chapter();
                     chapter.setTitle(dto.getTitle());
                     chapter.setOrderIndex(dto.getOrderIndex());
+                    chapter.setCoverImageUrl(dto.getCoverImageUrl());
                     chapter.setSection(section);
                     return ResponseEntity.ok(chapterRepository.save(chapter));
                 })
@@ -115,6 +118,7 @@ public class AdminCourseController {
                 .map(chapter -> {
                     chapter.setTitle(dto.getTitle());
                     chapter.setOrderIndex(dto.getOrderIndex());
+                    chapter.setCoverImageUrl(dto.getCoverImageUrl());
                     return ResponseEntity.ok(chapterRepository.save(chapter));
                 })
                 .orElse(ResponseEntity.notFound().build());
@@ -141,6 +145,7 @@ public class AdminCourseController {
                     lecture.setTitle(dto.getTitle());
                     lecture.setContentText(dto.getContentText());
                     lecture.setVideoUrl(dto.getVideoUrl());
+                    lecture.setCoverImageUrl(dto.getCoverImageUrl());
                     lecture.setOrderIndex(dto.getOrderIndex());
                     lecture.setChapter(chapter);
                     return ResponseEntity.ok(lectureRepository.save(lecture));
@@ -164,6 +169,7 @@ public class AdminCourseController {
                     lecture.setTitle(dto.getTitle());
                     lecture.setContentText(dto.getContentText());
                     lecture.setVideoUrl(dto.getVideoUrl());
+                    lecture.setCoverImageUrl(dto.getCoverImageUrl());
                     lecture.setOrderIndex(dto.getOrderIndex());
                     return ResponseEntity.ok(lectureRepository.save(lecture));
                 })
@@ -341,6 +347,7 @@ public class AdminCourseController {
      */
     private void updateTestDataFromRequest(Test test, CreateTestRequest request) {
         test.setTitle(request.getTitle());
+        test.setCoverImageUrl(request.getCoverImageUrl());
 
         if (request.getPassingScore() == null || request.getPassingScore() <= 0 || (request.getQuestions() != null && request.getPassingScore() > request.getQuestions().size())) {
             throw new IllegalArgumentException("Invalid passing score value. It must be between 1 and the number of questions.");

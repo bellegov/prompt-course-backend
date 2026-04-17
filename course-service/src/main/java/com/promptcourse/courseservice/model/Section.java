@@ -24,4 +24,6 @@ public class Section {
 
     @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
     private boolean isPremium = false;
+
+    private String coverImageUrl;
 }

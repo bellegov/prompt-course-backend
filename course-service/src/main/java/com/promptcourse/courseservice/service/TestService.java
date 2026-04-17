@@ -92,6 +92,7 @@ public class TestService {
         return UserTestViewDto.builder()
                 .testId(test.getId())
                 .title(test.getTitle())
+                .coverImageUrl(test.getCoverImageUrl())
                 .questions(test.getQuestions().stream()
                         .map(this::mapQuestionToViewDto)
                         .collect(Collectors.toList()))
