@@ -9,9 +9,11 @@ public class CreateTestRequest {
     private List<QuestionDTO> questions;
     private Integer passingScore;
 
+
     @Data
     public static class QuestionDTO {
         private String questionText;
+        private String coverImageUrl;
         private List<AnswerDTO> answers;
     }
 
@@ -19,6 +21,7 @@ public class CreateTestRequest {
     public static class AnswerDTO {
         private String answerText;
         private Boolean isCorrect;
+        private String coverImageUrl;
     }
 
     private String coverImageUrl;

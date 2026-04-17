@@ -20,4 +20,6 @@ public class Answer {
     @JoinColumn(name = "question_id")
     @JsonBackReference
     private Question question;
+
+    private String coverImageUrl;
 }

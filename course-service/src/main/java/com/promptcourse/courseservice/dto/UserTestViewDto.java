@@ -17,6 +17,7 @@ public class UserTestViewDto {
     public static class QuestionViewDto {
         private Long questionId;
         private String questionText;
+        private String coverImageUrl;
         private List<AnswerViewDto> answers;
     }
 
@@ -25,5 +26,6 @@ public class UserTestViewDto {
     public static class AnswerViewDto {
         private Long answerId;
         private String answerText;
+        private String coverImageUrl;
     }
 }

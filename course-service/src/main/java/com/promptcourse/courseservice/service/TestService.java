@@ -103,6 +103,7 @@ public class TestService {
         return UserTestViewDto.QuestionViewDto.builder()
                 .questionId(question.getId())
                 .questionText(question.getQuestionText())
+                .coverImageUrl(question.getCoverImageUrl())
                 .answers(question.getAnswers().stream()
                         .map(this::mapAnswerToViewDto)
                         .collect(Collectors.toList()))
@@ -113,6 +114,7 @@ public class TestService {
         return UserTestViewDto.AnswerViewDto.builder()
                 .answerId(answer.getId())
                 .answerText(answer.getAnswerText())
+                .coverImageUrl(answer.getCoverImageUrl())
                 .build();
     }
 }

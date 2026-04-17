@@ -18,6 +18,8 @@ public class Question {
     @Column(columnDefinition = "TEXT")
     private String questionText;
 
+    private String coverImageUrl;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "test_id")
     @JsonBackReference

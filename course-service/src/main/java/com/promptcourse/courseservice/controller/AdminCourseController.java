@@ -366,6 +366,7 @@ public class AdminCourseController {
             request.getQuestions().forEach(qDto -> {
                 Question question = new Question();
                 question.setQuestionText(qDto.getQuestionText());
+                question.setCoverImageUrl(qDto.getCoverImageUrl());
                 question.setTest(test);
                 question.setAnswers(new ArrayList<>());
 
@@ -373,6 +374,7 @@ public class AdminCourseController {
                     qDto.getAnswers().forEach(aDto -> {
                         Answer answer = new Answer();
                         answer.setAnswerText(aDto.getAnswerText());
+                        answer.setCoverImageUrl(aDto.getCoverImageUrl());
                         answer.setCorrect(aDto.getIsCorrect() != null && aDto.getIsCorrect());
                         answer.setQuestion(question);
                         question.getAnswers().add(answer);
